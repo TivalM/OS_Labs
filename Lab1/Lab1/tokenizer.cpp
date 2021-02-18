@@ -3,14 +3,15 @@
 #include <iostream>
 #include <regex>
 
-tokenizer::tokenizer(char* filename) {
+Tokenizer::Tokenizer(char* filename) {
 	row = offset = finalSpotLine = finalSpotOffset = 0;
 	lineToProcess = NULL;
-	token = NULL;
+	currentToken = NULL;
+	this->filename = filename;
 	infile.open(filename);
 }
 
-char* tokenizer::getToken() {
+char* Tokenizer::getToken() {
 	if (lineToProcess == NULL) {
 		if (infile.eof()) {
 			// reached eof
@@ -20,22 +21,23 @@ char* tokenizer::getToken() {
 		if (strLine.empty()) {
 			if (infile.eof()) {
 				// skip last empty line
+				finalSpotOffset++;
 				return NULL;
 			}
 		}
 		lineToProcess = (char*)strLine.data();
-		token = strtok(lineToProcess, " \t\n");
+		currentToken = strtok(lineToProcess, " \t\n");
 		row++;
 		finalSpotLine = row;
-		finalSpotOffset = offset = 1;
+		finalSpotOffset = offset = 0;
 	}
 	else {
-		token = strtok(NULL, " \t\n");
+		currentToken = strtok(NULL, " \t\n");
 	}
-	if (token != NULL) {
-		offset = token - lineToProcess + 1;
-		finalSpotOffset = offset + strlen(token);
-		return token;
+	if (currentToken != NULL) {
+		offset = currentToken - lineToProcess + 1;
+		finalSpotOffset = offset + strlen(currentToken) - 1;
+		return currentToken;
 	}
 	else {
 		//no token in current line
@@ -44,61 +46,75 @@ char* tokenizer::getToken() {
 	}
 }
 
-int tokenizer::readInt() {
-	char* token = getToken();
-	if (token != NULL) {
+int Tokenizer::readInt() {
+	getToken();
+	if (currentToken != NULL) {
 		//if every digit of c is num, then c is num
 		bool flag = true;
-		for (int i = 0; i < strlen(token); i++) {
-			if (!isdigit(token[i])) {
+		for (int i = 0; i < strlen(currentToken); i++) {
+			if (!isdigit(currentToken[i])) {
 				flag = false;
 			}
 		}
-		return flag ? std::stoi(token) : NULL;
-	}
-	return NULL;
-}
-
-char* tokenizer::readSymbol() {
-	char* token = getToken();
-	if (token != NULL) {
-		//if every digit of c is num, then c is num		
-		if (std::regex_match(token, std::regex("^[a-z]([a-z]|[0-9])*", std::regex::icase))) {
-			return token;
+		if (flag) {
+			return std::stoi(currentToken);
 		}
+
 	}
-	return NULL;
+
+	return INT_MIN;
 }
 
-char tokenizer::readIAER() {
-	char* token = getToken();
-	if (token != NULL && strlen(token) == 1) {
-		//if every digit of c is num, then c is num
-		if (token[0] == 'I' || token[0] == 'A' || token[0] == 'E' || token[0] == 'R') {
-			return token[0];
+char* Tokenizer::getCurrentToken() {
+	return currentToken;
+}
+
+char* Tokenizer::readSymbol() {
+	getToken();
+	if (currentToken != NULL) {
+		if (std::regex_match(currentToken, std::regex("^[a-z]([a-z]|[0-9])*", std::regex::icase))) {
+			return currentToken;
 		}
+
 	}
 	return NULL;
 }
 
-int tokenizer::getRow() {
+char Tokenizer::readIAER() {
+	getToken();
+	if (currentToken != NULL) {
+		if (strlen(currentToken) == 1 && currentToken[0] == 'I' || currentToken[0] == 'A' || currentToken[0] == 'E' || currentToken[0] == 'R') {
+			return currentToken[0];
+		}
+
+	}
+	return NULL;
+}
+
+int Tokenizer::getRow() {
 	return row;
 }
 
-int tokenizer::getOffset() {
+int Tokenizer::getOffset() {
 	return offset;
 }
 
-int tokenizer::getFinalSpotLine() {
-	if (infile.eof()) {
+int Tokenizer::getFinalSpotLine() {
 		return finalSpotLine;
-	}
-	return -1;
 }
 
-int tokenizer::getFinalSpotOffset() {
-	if (infile.eof()) {
+int Tokenizer::getFinalSpotOffset() {
 		return finalSpotOffset;
-	}
-	return -1;
+}
+
+bool Tokenizer::isEndOfFile() {
+	return (lineToProcess == NULL || strLine.empty()) && infile.eof();
+}
+
+void Tokenizer::resetState() {
+	row = offset = finalSpotLine = finalSpotOffset = 0;
+	lineToProcess = NULL;
+	currentToken = NULL;
+	infile.close();
+	infile.open(filename);
 }

@@ -4,27 +4,32 @@
 
 #include <fstream>
 #include <string>
-static char IAER[]{'I','A','E','R'};
+static char IAER[]{ 'I','A','E','R' };
 
-class tokenizer
+class Tokenizer
 {
 public:
-	tokenizer(char*);
-	char* getToken();
+	Tokenizer(char*);
 	int readInt();
+	char* getCurrentToken();
 	char* readSymbol();
 	char readIAER();
 	int getRow();
 	int getOffset();
 	int getFinalSpotLine();
 	int getFinalSpotOffset();
+	bool isEndOfFile();
+	void resetState();
+	char* getToken();
 
 private:
+
+	char* filename;
 	int row;
 	int offset;
 	int finalSpotLine;
 	int finalSpotOffset;
-	char* token;
+	char* currentToken;
 	char* lineToProcess;
 	std::ifstream infile;
 	std::string strLine;
