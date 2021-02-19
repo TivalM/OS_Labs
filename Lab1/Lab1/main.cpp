@@ -6,33 +6,40 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <iomanip>
 #include "tokenizer.h"
 
 using namespace std;
-
-void pass1();
-void processSymbol(int& symblelIndex, int addressOffset, int modelCount, int modelLength);
-void parseError(int errcode, Tokenizer& tokenizer);
-void printSymbleTable();
 
 struct TableEntry
 {
 public:
 	string symble;
-	int address;
-	bool isDefinedMutiltTimes;
+	int address = -1;
+	int moduelBelogsTo;
+	bool isDefinedMutiltTimes = false;
+	bool isUsed = false;		//use in pass 2 
+	bool addInPass2 = false;	//use in pass 2 
 	bool operator==(const TableEntry& entry) const {
 		return entry.symble == (symble);
 	}
 };
 
-char* filename = (char*)"G:\\Project\\NYU\\OS\\lab1\\reference\\lab1samples\\input-21";
+void pass1();
+void pass2();
+void processSymbol(int& symblelIndex, int addressOffset, int modelCount, int modelLength);
+void processInstruction(vector<TableEntry>& useList, int memoryIndex, int startOffset, int, int oprand, char addressMode);
+void parseError(int errcode, Tokenizer& tokenizer);
+void printSymbleTable();
+
+char* filename = (char*)"G:\\Project\\NYU\\OS\\lab1\\reference\\lab1samples\\input-20";
 vector<TableEntry> symbleTable;
 
 int main(int argc, char* argv[]) {
 	//filename = argv[1];
 	cout << "fileName: " << filename << endl;
 	pass1();
+	pass2();
 	//Tokenizer tokenizer(filename);
 	//while (!tokenizer.isEndOfFile()) {
 	//	char* a = tokenizer.getToken();
@@ -53,9 +60,9 @@ void pass1() {
 	int symblelIndex = 0;
 	int totalInstrNum = 0;
 	while (!tokenizer.isEndOfFile()) {
-		modelCount++;
 		int defCount = tokenizer.readInt();
 		if (defCount != INT_MIN) {
+			modelCount++;
 			if (defCount < 16 || defCount == 16) {
 				for (int i = 0; i < defCount; i++) {
 					char* symbol = tokenizer.readSymbol();
@@ -68,6 +75,7 @@ void pass1() {
 							TableEntry tmpEntry;
 							tmpEntry.symble = *&symbol;
 							tmpEntry.address = val;
+							tmpEntry.moduelBelogsTo = modelCount;
 							if (find(symbleTable.begin(), symbleTable.end(), tmpEntry) == symbleTable.end()) {
 								tmpEntry.isDefinedMutiltTimes = false;
 								symbleTable.push_back(tmpEntry);
@@ -152,6 +160,206 @@ void pass1() {
 	printSymbleTable();
 }
 
+void pass2() {
+	Tokenizer tokenizer(filename);
+	int modelStartOffset = 0;
+	int modelCount = 0;
+	int instrCount = 0;
+	int totalInstrNum = 0;
+	cout << "Memory Map" << endl;
+	while (!tokenizer.isEndOfFile()) {
+		vector<TableEntry> useList;
+		int defCount = tokenizer.readInt();
+		if (defCount != INT_MIN) {
+			modelCount++;
+			if (defCount < 16 || defCount == 16) {
+				for (int i = 0; i < defCount; i++) {
+					char* symbol = tokenizer.readSymbol();
+					if (symbol != NULL) {
+						if (strlen(symbol) > 16) {
+							parseError(3, tokenizer);
+						}
+						int val = tokenizer.readInt();
+						if (val != INT_MIN) {
+							//todo
+						}
+						else {
+							parseError(0, tokenizer);
+						}
+					}
+					else {
+						parseError(1, tokenizer);
+					}
+				}
+			}
+			else {
+				parseError(4, tokenizer);
+			}
+		}
+		else {
+			if (tokenizer.isEndOfFile()) {
+				break;
+			}
+			else {
+				parseError(0, tokenizer);
+			}
+		}
+		int useCount = tokenizer.readInt();
+		if (useCount != INT_MIN) {
+			if (useCount < 16 || useCount == 16) {
+				for (int i = 0; i < useCount; i++) {
+					char* symbol = tokenizer.readSymbol();
+					if (symbol != NULL) {
+						if (strlen(symbol) > 16) {
+							parseError(3, tokenizer);
+						}
+						else {
+							TableEntry tmpEntry;
+							tmpEntry.symble = symbol;
+							if (find(symbleTable.begin(), symbleTable.end(), tmpEntry) != symbleTable.end()) {
+								//already exist in symble table
+							}
+							else {
+								tmpEntry.address = 0; //use zero as address
+								tmpEntry.addInPass2 = true;
+								symbleTable.push_back(tmpEntry);
+							}
+							useList.push_back(tmpEntry);
+						}
+					}
+					else {
+						parseError(1, tokenizer);
+					}
+				}
+			}
+			else {
+				parseError(5, tokenizer);
+			}
+		}
+		else {
+			parseError(0, tokenizer);
+		}
+		int instCount = tokenizer.readInt();
+		if (instCount != INT_MIN) {
+			totalInstrNum += instCount;
+			if (totalInstrNum < 512) {
+				for (int i = 0; i < instCount; i++) {
+					char addressMode = tokenizer.readIAER();
+					if (addressMode != NULL) {
+						bool appendValueOverflowError = false;
+						int oprand = tokenizer.readInt();
+						if (oprand != INT_MIN) {
+							processInstruction(useList, i, totalInstrNum - instCount, instCount, oprand, addressMode);
+						}
+						else {
+							parseError(0, tokenizer);
+						}
+					}
+					else {
+						parseError(2, tokenizer);
+					}
+				}
+				for (int i = 0; i < useList.size(); i++) {
+					if (!useList[i].isUsed) {
+						cout << "Warning: Module " << modelCount << ": " << useList[i].symble << " appeared in the uselist but was not actually used" << endl;
+					}
+				}
+			}
+			else {
+				parseError(6, tokenizer);
+			}
+			modelStartOffset += instCount;
+		}
+		else {
+			parseError(0, tokenizer);
+		}
+
+	}
+	cout << endl;
+	for (int i = 0; i < symbleTable.size(); i++) {
+		if (!symbleTable[i].isUsed && !symbleTable[i].addInPass2) {
+			cout << "Warning: Module " << symbleTable[i].moduelBelogsTo << ": " << symbleTable[i].symble << " was defined but never used" << endl;
+		}
+	}
+}
+
+void processInstruction(vector<TableEntry>& useList, int modelInstrIndex, int startOffset, int modelSize, int oprand, char addressMode) {
+	if (addressMode == 'I') {
+		bool isValueOverflow = false;
+		if (oprand > 9999) {
+			oprand = 9999;
+			isValueOverflow = true;
+		}
+		cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << setw(4) << oprand;
+		if (isValueOverflow) {
+			cout << " Error: Illegal immediate value; treated as 9999";
+		}
+		cout << endl;
+	}
+	else if (addressMode == 'A') {
+		bool isValueOverflow = false;
+		bool isOpOverflow = false;
+
+		if (oprand / 1000 > 9) {
+			oprand = 9999;
+			isOpOverflow = true;
+		}
+		if (!isOpOverflow && oprand % 1000 > 511) {
+			oprand = oprand / 1000 * 1000;
+			isValueOverflow = true;
+		}
+		cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << setw(4) << oprand;
+		if (isOpOverflow) {
+			cout << " Illegal opcode; treated as 9999";
+		}
+		else if (isValueOverflow) {
+			cout << " Error: Absolute address exceeds machine size; zero used";
+		}
+		cout << endl;
+	}
+	else if (addressMode == 'E') {
+		if (oprand / 1000 > 9) {
+			cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << "9999";
+			cout << " Error: Illegal opcode; treated as 9999";
+		}
+		else if (oprand % 1000 > useList.size() - 1) {
+			cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << setw(4) << oprand;
+			cout << " Error: External address exceeds length of uselist; treated as immediate";
+		}
+		else {
+			int entryIndex = oprand % 1000;
+			useList[entryIndex].isUsed = true;
+			find(symbleTable.begin(), symbleTable.end(), useList[entryIndex])->isUsed = true;
+
+			int address = find(symbleTable.begin(), symbleTable.end(), useList[entryIndex])->address;
+			bool isAddedInPass2 = find(symbleTable.begin(), symbleTable.end(), useList[entryIndex])->addInPass2;
+			oprand = oprand / 1000 * 1000 + address;
+			cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << setw(4) << oprand;
+			if (isAddedInPass2) {
+				string symble = find(symbleTable.begin(), symbleTable.end(), useList[entryIndex])->symble;
+				cout << " Error: " << symble << " is not defined; zero used";
+			}
+		}
+		cout << endl;
+	}
+	else if (addressMode == 'R') {
+		if (oprand / 1000 > 9) {
+			cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << "9999";
+			cout << " Error: Illegal opcode; treated as 9999";
+		}
+		else if (oprand % 1000 > modelSize - 1) {
+			oprand = oprand / 1000 * 1000 + startOffset;
+			cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << setw(4) << oprand;
+			cout << " Error: Relative address exceeds module size; zero used";
+		}
+		else {
+			oprand = oprand / 1000 * 1000 + startOffset + oprand % 1000;
+			cout << setfill('0') << setw(3) << startOffset + modelInstrIndex << ": " << setw(4) << oprand;
+		}
+		cout << endl;
+	}
+}
+
 void processSymbol(int& symblelIndex, int addressOffset, int modelCount, int modelLength) {
 
 	for (int i = symblelIndex; i < symbleTable.size(); i++) {
@@ -178,6 +386,7 @@ void printSymbleTable() {
 			cout << endl;
 		}
 	}
+	cout << endl;
 }
 
 void parseError(int errcode, Tokenizer& tokenizer) {
