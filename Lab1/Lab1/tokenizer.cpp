@@ -1,7 +1,8 @@
 #include "tokenizer.h"
-#include <limits.h>
+#include <climits>
 #include <iostream>
 #include <regex>
+#define MAX_NUM_VALUE (1<<30)
 
 Tokenizer::Tokenizer(char* filename) {
 	row = offset = finalSpotLine = finalSpotOffset = 0;
@@ -44,25 +45,33 @@ char* Tokenizer::getToken() {
 		lineToProcess = NULL;
 		getToken();
 	}
+	return NULL;
 }
 
 int Tokenizer::readInt() {
 	getToken();
+	int sum = 0;
 	if (currentToken != NULL) {
 		//if every digit of c is num, then c is num
-		bool flag = true;
 		for (int i = 0; i < strlen(currentToken); i++) {
-			if (!isdigit(currentToken[i])) {
-				flag = false;
+			if (isdigit(currentToken[i])) {
+				if (sum * 10 + (currentToken[i] - '0') >= MAX_NUM_VALUE) {
+					//overflow
+					return INT_MIN;
+				}
+				else {
+					sum = sum * 10 + (currentToken[i] - '0');
+				}
+			}
+			else {
+				return INT_MIN;
 			}
 		}
-		if (flag) {
-			return std::stoi(currentToken);
-		}
-
 	}
-
-	return INT_MIN;
+	else {
+		return INT_MIN;
+	}
+	return sum;
 }
 
 char* Tokenizer::getCurrentToken() {
@@ -100,11 +109,11 @@ int Tokenizer::getOffset() {
 }
 
 int Tokenizer::getFinalSpotLine() {
-		return finalSpotLine;
+	return finalSpotLine;
 }
 
 int Tokenizer::getFinalSpotOffset() {
-		return finalSpotOffset;
+	return finalSpotOffset;
 }
 
 bool Tokenizer::isEndOfFile() {
