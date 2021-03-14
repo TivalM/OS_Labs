@@ -18,5 +18,19 @@
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="getopt.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BaseObjects.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="getopt.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseObjects.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

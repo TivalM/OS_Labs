@@ -95,7 +95,6 @@ char Tokenizer::readIAER() {
 		if (strlen(currentToken) == 1 && currentToken[0] == 'I' || currentToken[0] == 'A' || currentToken[0] == 'E' || currentToken[0] == 'R') {
 			return currentToken[0];
 		}
-
 	}
 	return NULL;
 }
