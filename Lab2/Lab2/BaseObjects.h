@@ -19,8 +19,8 @@ enum class TransitionType {
 	TRANS_TO_PREEMPT	//
 };
 
-inline const char* stateToString(ProcessState s){
-	switch (s){
+inline const char* stateToString(ProcessState s) {
+	switch (s) {
 	case ProcessState::CREATED:	return "CREATED";
 	case ProcessState::READY:   return "READY";
 	case ProcessState::RUNNING: return "RUNNING";
@@ -42,17 +42,17 @@ public:
 	int totalCpuTime;
 	int maxCpuBurst;
 	int maxIOBurst;
-	int currentCpuBrust=-1;
-	int currentIOBrust = -1;
+	int currentCpuBrust = 0;
+	int currentIOBrust = 0;
 	int remainingCpuTime;
 	int staticPrio;
 	int dynamicPrio;
-	int timeLastStateStart = -1;
+	int timeLastStateStart = 0;
 
-	int finishAtTime = -1;
-	int turnAroundTime = -1;
-	int IOTime = -1;
-	int cpuTime = -1;
+	int finishAtTime = 0;
+	int turnAroundTime = 0;
+	int IOTime = 0;
+	int cpuWaitingTime = 0;
 };
 
 class Event
@@ -75,7 +75,7 @@ public:
 	virtual void addProcess(Process* process) = 0;
 	virtual Process* getNextProcess() = 0;
 	virtual void test_preempt(Process* p, int curtime) = 0;
-private:
+protected:
 	deque<Process*> readyQueue;
 };
 

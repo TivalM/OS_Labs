@@ -16,14 +16,21 @@
 #include <unistd.h>
 #endif
 using namespace std;
+
+
 int readOneRandomInt(int brust);
 void readAllProcess();
 Event* getEvent();
+void printLog(Event* evt, Event* newEvt);
+void printEventQueue();
+void simulation();
+bool compareTwoEvent(Event* eventA, Event* eventB);
+
 
 bool vFlag = true;
 bool tFlag = false;
-bool eFlag = false;
-char* sValue = NULL;
+bool eFlag = true;
+const char* sValue;
 int quantumNum = 100000;
 int maxProiNum = 4;
 int randCount = 0;
@@ -47,7 +54,9 @@ int main(int argc, char** argv)
 	inRandFile.open(randFile);
 	inRandFile >> randCount;
 	readAllProcess();
-	if (strcmp(sValue, "F")) {
+	sValue = "F";
+
+	if (strcmp(sValue, "F") == 0) {
 		scheduler = new FIFO();
 	}
 	simulation();
@@ -76,7 +85,7 @@ void readAllProcess() {
 		if (a != -1) {
 			Process* process = new Process(a, b, c, d, readOneRandomInt(maxProiNum));
 			processList.push(process);
-			Event* evt = new Event(a, process, ProcessState::CREATED, ProcessState::CREATED);
+			Event* evt = new Event(a, process, ProcessState::CREATED, ProcessState::READY);
 			eventList.push_back(evt);
 		}
 		else {
@@ -95,52 +104,75 @@ void simulation() {
 		timeDuration = currentTime - proc->timeLastStateStart;
 
 		switch (evt->getTransitionType()) {
-		case TransitionType::CREATE_TO_READY:
-			Event* newEvt = new Event(currentTime, proc, ProcessState::CREATED, ProcessState::READY);
-			eventList.push_back(newEvt);
-			if (vFlag) {
-				newEvt->printInfo();
-			}
-			stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
-			break;
-		case TransitionType::BLOCKED_TO_READY:
+		case TransitionType::CREATE_TO_READY: {
+			//add process into ready queue
+			scheduler->addProcess(proc);
 			CALL_SCHEDULER = true;
-			break;
-		case TransitionType::READY_TO_RUNNING:
+		}
+											break;
+		case TransitionType::BLOCKED_TO_READY: {
+			//process consumed an io brust
+			proc->IOTime += proc->currentIOBrust;
+			proc->currentIOBrust = 0;
+			proc->dynamicPrio = proc->staticPrio - 1;
+
+			//add process into ready queue
+			scheduler->addProcess(proc);
+			proc->timeLastStateStart = currentTime;
+			CALL_SCHEDULER = true;
+		}
+											 break;
+		case TransitionType::READY_TO_RUNNING: {
+			proc->cpuWaitingTime += timeDuration;
+			//generate a cpu brust
 			int cb = readOneRandomInt(proc->maxCpuBurst);
-			cb = cb > proc->maxCpuBurst ? proc->maxCpuBurst : cb;;
+			cb = cb > proc->maxCpuBurst ? proc->maxCpuBurst : cb;
 			proc->currentCpuBrust = cb;
 			if (cb < quantumNum) {
 				//insert event running to block
 				Event* newEvt = new Event(currentTime + cb, proc, ProcessState::RUNNING, ProcessState::BLOCKED);
-				eventList.push_front(newEvt);
-				if (vFlag) {
-					newEvt->printInfo();
-				}
+				eventList.push_back(newEvt);
+				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+				printLog(evt,newEvt);
 			}
 			else {
-				//insert event running to pre
+				//insert event running to preempt
 
 			}
-			stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
-			break;
-		case TransitionType::RUNNING_TO_BLOCK:
-			int ib = readOneRandomInt(proc->maxIOBurst);
-			ib = ib > proc->maxIOBurst ? proc->maxIOBurst : ib;;
-			proc->maxIOBurst = ib;
-			//insert event block to ready
-			Event* newEvt = new Event(currentTime + ib, proc, ProcessState::BLOCKED, ProcessState::READY);
-			eventList.push_back(newEvt);
-			if (vFlag) {
-				newEvt->printInfo();
+		}
+											 break;
+		case TransitionType::RUNNING_TO_BLOCK: {
+			//process consumed a cpu brust
+			if (proc->remainingCpuTime > proc->currentCpuBrust) {
+				proc->remainingCpuTime -= proc->currentCpuBrust;
 			}
+			else {
+				//process should terminate here 
+				proc->finishAtTime = currentTime - (proc->currentCpuBrust - proc->remainingCpuTime);
+				proc->remainingCpuTime = 0;
+			}
+			proc->currentCpuBrust = 0;
 
-			stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
-			break;
-		case TransitionType::TRANS_TO_PREEMPT:
-			break;
-		default:
-			break;
+			if (proc->remainingCpuTime > 0) {
+				//generate an io brust
+				int ib = readOneRandomInt(proc->maxIOBurst);
+				ib = ib > proc->maxIOBurst ? proc->maxIOBurst : ib;;
+				proc->currentIOBrust = ib;
+				//insert event block to ready
+				Event* newEvt = new Event(currentTime + ib, proc, ProcessState::BLOCKED, ProcessState::READY);
+				eventList.push_back(newEvt);
+				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+				printLog(evt,newEvt);
+				CALL_SCHEDULER = true;
+			}
+		}
+											 break;
+		case TransitionType::TRANS_TO_PREEMPT: {
+		}
+											 break;
+		default: {
+		}
+			   break;
 		}
 
 		if (CALL_SCHEDULER) {
@@ -150,11 +182,18 @@ void simulation() {
 		CALL_SCHEDULER = false;
 		if (CURRENT_RUNNING_PROCESS == nullptr) {
 			CURRENT_RUNNING_PROCESS = scheduler->getNextProcess();
+			if (CURRENT_RUNNING_PROCESS == nullptr) {
+				continue;
+			}
+			else{
+				// create event to make process runnable for same time.
+				Event* newEvt = new Event(currentTime, CURRENT_RUNNING_PROCESS, ProcessState::READY, ProcessState::RUNNING);
+				eventList.push_back(newEvt);
+				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+				printLog(evt, newEvt);
+			}
 		}
-		if (CURRENT_RUNNING_PROCESS == nullptr) {
-			continue;
-		}
-		// create event to make process runnable for same time.
+
 	}
 }
 
@@ -169,12 +208,28 @@ Event* getEvent() {
 	}
 }
 
+void printLog(Event* evt, Event* newEvt) {
+	if (vFlag) {
+		if (evt != nullptr){
+			evt->printInfo();
+
+		}
+		if (eFlag) {
+			if (newEvt != nullptr){
+				cout << "AddEvent(" << newEvt->timeStamp << ":" << newEvt->process->pid << ":" << stateToString(newEvt->newState) << ")";
+				cout << "====>";
+				printEventQueue();
+			}
+		}
+	}
+}
+
 void printEventQueue() {
 	int eventQueueSize = eventList.size();
 	for (int i = 0; i < eventQueueSize; i++) {
-		cout << "event " << i << " : ";
-		eventList[i]->printInfo();
+		cout << " (" << eventList[i]->timeStamp << ":" << eventList[i]->process->pid << ":" << stateToString(eventList[i]->newState) << ") ";
 	}
+	cout << endl;
 }
 
 bool compareTwoEvent(Event* eventA, Event* eventB) {

@@ -12,7 +12,7 @@ Process::Process(int arriveTime, int totalCpuTime, int maxCpuBurst, int maxIOBur
 	this->maxIOBurst = maxIOBurst;
 	this->staticPrio = staticPrio;
 	this->dynamicPrio = staticPrio - 1;
-
+	this->remainingCpuTime = totalCpuTime;
 }
 
 void Process::printInfo()
@@ -33,10 +33,16 @@ Event::~Event() {}
 
 void Event::printInfo()
 {
-	cout << timeStamp << " <" << process->pid << "> " << timeStamp - process->timeLastStateStart
+	cout << timeStamp << "<" << process->pid << ">" << timeStamp - process->timeLastStateStart << " "
 		<< stateToString(oldState) << " -> " << stateToString(newState) << " ";
 	if (newState == ProcessState::RUNNING) {
-		cout << "cb=" << process->currentCpuBrust << " rem=" << process->remainingCpuTime << " prio=" << process->dynamicPrio;
+		cout << "cb=" << process->currentCpuBrust << " rem=" << process->remainingCpuTime << " prio=" << process->dynamicPrio << endl;
+	}
+	else if (newState == ProcessState::BLOCKED) {
+		cout << "ib=" << process->currentIOBrust << " rem=" << process->remainingCpuTime << endl;
+	}
+	else {
+		cout << endl;
 	}
 }
 
@@ -65,13 +71,25 @@ TransitionType Event::getTransitionType()
 	}
 }
 
-void FIFO::addProcess(Process* process)
-{
+void FIFO::addProcess(Process* process) {
+	readyQueue.push_back(process);
 }
 
 Process* FIFO::getNextProcess()
 {
-	return nullptr;
+	if (readyQueue.size() > 0) {
+		if (readyQueue[0]->remainingCpuTime == 0)
+		{
+			readyQueue.pop_front();
+			getNextProcess();
+		}
+		else {
+			return readyQueue[0];
+		}
+	}
+	else {
+		return nullptr;
+	}
 }
 
 void FIFO::test_preempt(Process* p, int curtime) {
