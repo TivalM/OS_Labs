@@ -25,7 +25,7 @@ void printLog(Event* evt, Event* newEvt);
 void printEventQueue();
 void simulation();
 bool compareTwoEvent(Event* eventA, Event* eventB);
-
+void printResult();
 
 bool vFlag = true;
 bool tFlag = false;
@@ -34,12 +34,12 @@ const char* sValue;
 int quantumNum = 100000;
 int maxProiNum = 4;
 int randCount = 0;
-char* inputFile = NULL;
-char* randFile = NULL;
+const char* inputFile = NULL;
+const char* randFile = NULL;
 std::ifstream inInputFile;
 std::ifstream inRandFile;
 
-queue<Process*> processList;
+deque<Process*> processList;
 deque<Event*> eventList;
 Scheduler* scheduler;
 
@@ -48,8 +48,10 @@ Process* CURRENT_RUNNING_PROCESS = nullptr;
 
 int main(int argc, char** argv)
 {
-	inputFile = argv[1];
-	randFile = argv[2];
+	//inputFile = argv[1];
+	//randFile = argv[2];
+	inputFile = "G:\\NYU\\OS\\Labs\\Lab2\\assignment\\lab2_sample\\input6";
+	randFile = "G:\\NYU\\OS\\Labs\\Lab2\\assignment\\lab2_sample\\rfile";
 	inInputFile.open(inputFile);
 	inRandFile.open(randFile);
 	inRandFile >> randCount;
@@ -60,6 +62,7 @@ int main(int argc, char** argv)
 		scheduler = new FIFO();
 	}
 	simulation();
+	printResult();
 }
 
 int readOneRandomInt(int seed) {
@@ -84,7 +87,7 @@ void readAllProcess() {
 		inInputFile >> a >> b >> c >> d;
 		if (a != -1) {
 			Process* process = new Process(a, b, c, d, readOneRandomInt(maxProiNum));
-			processList.push(process);
+			processList.push_back(process);
 			Event* evt = new Event(a, process, ProcessState::CREATED, ProcessState::READY);
 			eventList.push_back(evt);
 		}
@@ -108,6 +111,7 @@ void simulation() {
 			//add process into ready queue
 			scheduler->addProcess(proc);
 			CALL_SCHEDULER = true;
+			printLog(evt, nullptr);
 		}
 											break;
 		case TransitionType::BLOCKED_TO_READY: {
@@ -118,8 +122,8 @@ void simulation() {
 
 			//add process into ready queue
 			scheduler->addProcess(proc);
-			proc->timeLastStateStart = currentTime;
 			CALL_SCHEDULER = true;
+			printLog(evt, nullptr);
 		}
 											 break;
 		case TransitionType::READY_TO_RUNNING: {
@@ -127,13 +131,14 @@ void simulation() {
 			//generate a cpu brust
 			int cb = readOneRandomInt(proc->maxCpuBurst);
 			cb = cb > proc->maxCpuBurst ? proc->maxCpuBurst : cb;
+			cb = cb > proc->remainingCpuTime ? proc->remainingCpuTime : cb;
 			proc->currentCpuBrust = cb;
 			if (cb < quantumNum) {
 				//insert event running to block
 				Event* newEvt = new Event(currentTime + cb, proc, ProcessState::RUNNING, ProcessState::BLOCKED);
 				eventList.push_back(newEvt);
 				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
-				printLog(evt,newEvt);
+				printLog(evt, newEvt);
 			}
 			else {
 				//insert event running to preempt
@@ -143,13 +148,12 @@ void simulation() {
 											 break;
 		case TransitionType::RUNNING_TO_BLOCK: {
 			//process consumed a cpu brust
-			if (proc->remainingCpuTime > proc->currentCpuBrust) {
-				proc->remainingCpuTime -= proc->currentCpuBrust;
-			}
-			else {
+			CURRENT_RUNNING_PROCESS = nullptr;
+			proc->remainingCpuTime -= proc->currentCpuBrust;
+			if (proc->remainingCpuTime == 0){
 				//process should terminate here 
-				proc->finishAtTime = currentTime - (proc->currentCpuBrust - proc->remainingCpuTime);
-				proc->remainingCpuTime = 0;
+				proc->finishAtTime = currentTime;
+				printLog(evt, nullptr);
 			}
 			proc->currentCpuBrust = 0;
 
@@ -162,7 +166,7 @@ void simulation() {
 				Event* newEvt = new Event(currentTime + ib, proc, ProcessState::BLOCKED, ProcessState::READY);
 				eventList.push_back(newEvt);
 				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
-				printLog(evt,newEvt);
+				printLog(evt, newEvt);
 				CALL_SCHEDULER = true;
 			}
 		}
@@ -174,9 +178,10 @@ void simulation() {
 		}
 			   break;
 		}
+		proc->timeLastStateStart = currentTime;
 
 		if (CALL_SCHEDULER) {
-			if (eventList[0]->timeStamp == currentTime)
+			if (eventList.size() > 0 && eventList[0]->timeStamp == currentTime)
 				continue; //process next event from Event queue
 		}
 		CALL_SCHEDULER = false;
@@ -185,12 +190,12 @@ void simulation() {
 			if (CURRENT_RUNNING_PROCESS == nullptr) {
 				continue;
 			}
-			else{
+			else {
 				// create event to make process runnable for same time.
 				Event* newEvt = new Event(currentTime, CURRENT_RUNNING_PROCESS, ProcessState::READY, ProcessState::RUNNING);
 				eventList.push_back(newEvt);
 				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
-				printLog(evt, newEvt);
+				printLog(nullptr, newEvt);
 			}
 		}
 
@@ -210,16 +215,25 @@ Event* getEvent() {
 
 void printLog(Event* evt, Event* newEvt) {
 	if (vFlag) {
-		if (evt != nullptr){
+		if (evt != nullptr) {
 			evt->printInfo();
-
 		}
-		if (eFlag) {
-			if (newEvt != nullptr){
-				cout << "AddEvent(" << newEvt->timeStamp << ":" << newEvt->process->pid << ":" << stateToString(newEvt->newState) << ")";
-				cout << "====>";
-				printEventQueue();
+	}
+	if (eFlag) {
+		if (newEvt != nullptr) {
+			cout << "   AddEvent(" << newEvt->timeStamp << ":" << newEvt->process->pid << ":" << stateToString(newEvt->newState) << ")";
+			cout << "====>";
+			printEventQueue();
+		}
+	}
+	if (tFlag) {
+		if (evt != nullptr) {
+			cout << "SHCED(" << scheduler->readyQueue.size() << "): ";
+			int readyQueueSize = scheduler->readyQueue.size();
+			for (int i = 0; i < readyQueueSize; i++) {
+				cout << " " << scheduler->readyQueue[i]->pid << ":" << evt->timeStamp;
 			}
+			cout << endl;
 		}
 	}
 }
@@ -243,5 +257,16 @@ bool compareTwoEvent(Event* eventA, Event* eventB) {
 	else  if (eventA->timeStamp == eventB->timeStamp) {
 		//to modified
 		return false;
+	}
+}
+
+void printResult() {
+	if (strcmp(sValue, "F") == 0) {
+		cout << "FCFS" << endl;
+	}
+	for (int i = 0; i < processList.size(); i++){
+		Process* proc = processList[i];
+		cout <<setfill('0')<< setw(4) << i << ":" << setfill(' ') << setw(5) << proc->arriveTime << setw(5) << proc->totalCpuTime << setw(5) << proc->maxCpuBurst << setw(5) << proc->maxIOBurst << setw(2) << proc->staticPrio <<" | ";
+		cout << setfill(' ') << setw(5) << proc->finishAtTime << setw(6) << proc->finishAtTime- proc->arriveTime << setw(6) << proc->IOTime << setw(6) << proc->cpuWaitingTime << endl;
 	}
 }

@@ -75,7 +75,7 @@ public:
 	virtual void addProcess(Process* process) = 0;
 	virtual Process* getNextProcess() = 0;
 	virtual void test_preempt(Process* p, int curtime) = 0;
-protected:
+
 	deque<Process*> readyQueue;
 };
 

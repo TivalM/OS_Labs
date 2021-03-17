@@ -33,8 +33,15 @@ Event::~Event() {}
 
 void Event::printInfo()
 {
-	cout << timeStamp << "<" << process->pid << ">" << timeStamp - process->timeLastStateStart << " "
-		<< stateToString(oldState) << " -> " << stateToString(newState) << " ";
+	cout << timeStamp << "<" << process->pid << ">" << timeStamp - process->timeLastStateStart << " ";
+	if (process->remainingCpuTime==0){
+		cout << "Done"<<endl;
+		return;
+	}
+	else{
+		cout << stateToString(oldState) << " -> " << stateToString(newState) << " ";
+	}
+		
 	if (newState == ProcessState::RUNNING) {
 		cout << "cb=" << process->currentCpuBrust << " rem=" << process->remainingCpuTime << " prio=" << process->dynamicPrio << endl;
 	}
@@ -84,7 +91,9 @@ Process* FIFO::getNextProcess()
 			getNextProcess();
 		}
 		else {
-			return readyQueue[0];
+			Process* proc = readyQueue[0];
+			readyQueue.pop_front();
+			return proc;
 		}
 	}
 	else {
