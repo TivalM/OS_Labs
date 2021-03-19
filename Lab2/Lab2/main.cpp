@@ -46,6 +46,14 @@ Scheduler* scheduler;
 bool CALL_SCHEDULER = false;
 Process* CURRENT_RUNNING_PROCESS = nullptr;
 
+int TotalSimTime = 0;
+double CpuUtil = 0;
+double IOUtil = 0;
+double AvgTurnAround = 0;
+double AvgWaitTime = 0;
+double Throughoput = 0;
+int runningIOCount = 0;
+int ioStartTime;
 int main(int argc, char** argv)
 {
 	//inputFile = argv[1];
@@ -119,10 +127,16 @@ void simulation() {
 			proc->IOTime += proc->currentIOBrust;
 			proc->currentIOBrust = 0;
 			proc->dynamicPrio = proc->staticPrio - 1;
-
 			//add process into ready queue
 			scheduler->addProcess(proc);
 			CALL_SCHEDULER = true;
+			if (runningIOCount > 0) {
+				runningIOCount--;
+				if (runningIOCount == 0) {
+					//io end
+					IOUtil += currentTime - ioStartTime;
+				}
+			}
 			printLog(evt, nullptr);
 		}
 											 break;
@@ -150,7 +164,7 @@ void simulation() {
 			//process consumed a cpu brust
 			CURRENT_RUNNING_PROCESS = nullptr;
 			proc->remainingCpuTime -= proc->currentCpuBrust;
-			if (proc->remainingCpuTime == 0){
+			if (proc->remainingCpuTime == 0) {
 				//process should terminate here 
 				proc->finishAtTime = currentTime;
 				printLog(evt, nullptr);
@@ -166,6 +180,10 @@ void simulation() {
 				Event* newEvt = new Event(currentTime + ib, proc, ProcessState::BLOCKED, ProcessState::READY);
 				eventList.push_back(newEvt);
 				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+				if (runningIOCount == 0) {
+					ioStartTime = currentTime;
+				}
+				runningIOCount++;
 				printLog(evt, newEvt);
 				CALL_SCHEDULER = true;
 			}
@@ -179,7 +197,6 @@ void simulation() {
 			   break;
 		}
 		proc->timeLastStateStart = currentTime;
-
 		if (CALL_SCHEDULER) {
 			if (eventList.size() > 0 && eventList[0]->timeStamp == currentTime)
 				continue; //process next event from Event queue
@@ -198,7 +215,6 @@ void simulation() {
 				printLog(nullptr, newEvt);
 			}
 		}
-
 	}
 }
 
@@ -260,13 +276,34 @@ bool compareTwoEvent(Event* eventA, Event* eventB) {
 	}
 }
 
+
+//double TotalSimTime;
+//double CpuUtil;
+//double IOUtil;
+//double AvgTurnAround;
+//double AvgWaitTime;
+//double Throughoput;
+
 void printResult() {
 	if (strcmp(sValue, "F") == 0) {
 		cout << "FCFS" << endl;
 	}
-	for (int i = 0; i < processList.size(); i++){
+	for (int i = 0; i < processList.size(); i++) {
 		Process* proc = processList[i];
-		cout <<setfill('0')<< setw(4) << i << ":" << setfill(' ') << setw(5) << proc->arriveTime << setw(5) << proc->totalCpuTime << setw(5) << proc->maxCpuBurst << setw(5) << proc->maxIOBurst << setw(2) << proc->staticPrio <<" | ";
-		cout << setfill(' ') << setw(5) << proc->finishAtTime << setw(6) << proc->finishAtTime- proc->arriveTime << setw(6) << proc->IOTime << setw(6) << proc->cpuWaitingTime << endl;
+		CpuUtil += proc->totalCpuTime;
+		AvgTurnAround += (double)proc->finishAtTime - (double)proc->arriveTime;
+		AvgWaitTime += (double)proc->cpuWaitingTime;
+		TotalSimTime = proc->finishAtTime > TotalSimTime ? proc->finishAtTime : TotalSimTime;
+
+
+		cout << setfill('0') << setw(4) << i << ":" << setfill(' ') << setw(5) << proc->arriveTime << setw(5) << proc->totalCpuTime << setw(5) << proc->maxCpuBurst << setw(5) << proc->maxIOBurst << setw(2) << proc->staticPrio << " | ";
+		cout << setfill(' ') << setw(5) << proc->finishAtTime << setw(6) << proc->finishAtTime - proc->arriveTime << setw(6) << proc->IOTime << setw(6) << proc->cpuWaitingTime << endl;
 	}
+	CpuUtil = CpuUtil / TotalSimTime * (double)100;
+	IOUtil = IOUtil / TotalSimTime * (double)100;
+	AvgTurnAround /= processList.size();
+	AvgWaitTime /= processList.size();
+	Throughoput = (double)processList.size() / TotalSimTime * (double)100;
+	printf("SUM: %d %.2lf %.2lf %.2lf %.2lf %.3lf\n", TotalSimTime, CpuUtil, IOUtil, AvgTurnAround, AvgWaitTime, Throughoput);
+	//cout << fixed << setprecision(2) << "SUM: " << TotalSimTime << " " << CpuUtil << " " << IOUtil << " " << AvgTurnAround << " " << AvgWaitTime << " " << Throughoput;
 }
