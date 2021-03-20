@@ -80,7 +80,21 @@ public:
 };
 
 
-class FIFO :public Scheduler {
+class FCFS :public Scheduler {
+public:
+	void addProcess(Process* process);
+	Process* getNextProcess();
+	void test_preempt(Process* p, int curtime);
+};
+
+class LCFS :public Scheduler {
+public:
+	void addProcess(Process* process);
+	Process* getNextProcess();
+	void test_preempt(Process* p, int curtime);
+};
+
+class SRTF :public Scheduler {
 public:
 	void addProcess(Process* process);
 	Process* getNextProcess();

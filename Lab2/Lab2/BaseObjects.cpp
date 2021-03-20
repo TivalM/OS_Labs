@@ -78,11 +78,11 @@ TransitionType Event::getTransitionType()
 	}
 }
 
-void FIFO::addProcess(Process* process) {
+void FCFS::addProcess(Process* process) {
 	readyQueue.push_back(process);
 }
 
-Process* FIFO::getNextProcess()
+Process* FCFS::getNextProcess()
 {
 	if (readyQueue.size() > 0) {
 		if (readyQueue[0]->remainingCpuTime == 0)
@@ -101,5 +101,63 @@ Process* FIFO::getNextProcess()
 	}
 }
 
-void FIFO::test_preempt(Process* p, int curtime) {
+void FCFS::test_preempt(Process* p, int curtime) {
+}
+
+void LCFS::addProcess(Process* process)
+{
+	readyQueue.push_front(process);
+}
+
+Process* LCFS::getNextProcess()
+{
+	if (readyQueue.size() > 0) {
+		if (readyQueue[0]->remainingCpuTime == 0)
+		{
+			readyQueue.pop_front();
+			getNextProcess();
+		}
+		else {
+			Process* proc = readyQueue[0];
+			readyQueue.pop_front();
+			return proc;
+		}
+	}
+	else {
+		return nullptr;
+	}
+}
+
+void LCFS::test_preempt(Process* p, int curtime)
+{
+}
+
+void SRTF::addProcess(Process* process)
+{
+	readyQueue.push_back(process);
+}
+
+Process* SRTF::getNextProcess()
+{
+	if (readyQueue.size() > 0) {
+		int index = 0;
+		int timeRemain = readyQueue[0]->remainingCpuTime;
+		for (int i = 0; i < readyQueue.size(); i++)
+		{
+			if (readyQueue[i]->remainingCpuTime < timeRemain && readyQueue[i]->remainingCpuTime != 0) {
+				timeRemain = readyQueue[i]->remainingCpuTime;
+				index = i;
+			}
+		}
+		Process* proc = readyQueue[index];
+		readyQueue.erase(readyQueue.begin() + index);
+		return proc;
+	}
+	else {
+		return nullptr;
+	}
+}
+
+void SRTF::test_preempt(Process* p, int curtime)
+{
 }

@@ -29,7 +29,7 @@ void printResult();
 
 bool vFlag = true;
 bool tFlag = false;
-bool eFlag = true;
+bool eFlag = false;
 const char* sValue;
 int quantumNum = 100000;
 int maxProiNum = 4;
@@ -64,10 +64,20 @@ int main(int argc, char** argv)
 	inRandFile.open(randFile);
 	inRandFile >> randCount;
 	readAllProcess();
-	sValue = "F";
+	sValue = "R";
 
 	if (strcmp(sValue, "F") == 0) {
-		scheduler = new FIFO();
+		scheduler = new FCFS();
+	}
+	else if (strcmp(sValue, "L") == 0) {
+		scheduler = new LCFS();
+	}
+	else if (strcmp(sValue, "S") == 0) {
+		scheduler = new SRTF();
+	}
+	else if (strcmp(sValue, "R") == 0) {
+		scheduler = new FCFS();
+		quantumNum = 5;
 	}
 	simulation();
 	printResult();
@@ -134,7 +144,7 @@ void simulation() {
 				runningIOCount--;
 				if (runningIOCount == 0) {
 					//io end
-					IOUtil += currentTime - ioStartTime;
+					IOUtil += (double)currentTime - (double)ioStartTime;
 				}
 			}
 			printLog(evt, nullptr);
@@ -142,12 +152,19 @@ void simulation() {
 											 break;
 		case TransitionType::READY_TO_RUNNING: {
 			proc->cpuWaitingTime += timeDuration;
-			//generate a cpu brust
-			int cb = readOneRandomInt(proc->maxCpuBurst);
-			cb = cb > proc->maxCpuBurst ? proc->maxCpuBurst : cb;
-			cb = cb > proc->remainingCpuTime ? proc->remainingCpuTime : cb;
-			proc->currentCpuBrust = cb;
-			if (cb < quantumNum) {
+			int cb;
+			if (proc->currentCpuBrust==0){
+				//generate a cpu brust
+				cb = readOneRandomInt(proc->maxCpuBurst);
+				cb = cb > proc->maxCpuBurst ? proc->maxCpuBurst : cb;
+				cb = cb > proc->remainingCpuTime ? proc->remainingCpuTime : cb;
+				proc->currentCpuBrust = cb;
+			}
+			else{
+				//process reaming cpu brust
+				cb = proc->currentCpuBrust;
+			}
+			if (cb <= quantumNum) {
 				//insert event running to block
 				Event* newEvt = new Event(currentTime + cb, proc, ProcessState::RUNNING, ProcessState::BLOCKED);
 				eventList.push_back(newEvt);
@@ -155,14 +172,17 @@ void simulation() {
 				printLog(evt, newEvt);
 			}
 			else {
-				//insert event running to preempt
-
+				//insert event for preempt
+				Event* newEvt = new Event(currentTime + quantumNum, proc, ProcessState::RUNNING, ProcessState::READY);
+				eventList.push_back(newEvt);
+				stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+				printLog(evt, newEvt);
 			}
 		}
 											 break;
 		case TransitionType::RUNNING_TO_BLOCK: {
-			//process consumed a cpu brust
 			CURRENT_RUNNING_PROCESS = nullptr;
+			//process consumed a cpu brust
 			proc->remainingCpuTime -= proc->currentCpuBrust;
 			if (proc->remainingCpuTime == 0) {
 				//process should terminate here 
@@ -170,7 +190,6 @@ void simulation() {
 				printLog(evt, nullptr);
 			}
 			proc->currentCpuBrust = 0;
-
 			if (proc->remainingCpuTime > 0) {
 				//generate an io brust
 				int ib = readOneRandomInt(proc->maxIOBurst);
@@ -189,7 +208,14 @@ void simulation() {
 			}
 		}
 											 break;
-		case TransitionType::TRANS_TO_PREEMPT: {
+		case TransitionType::RUNNING_TO_READY: {
+			//preempted by the scheduler
+			CURRENT_RUNNING_PROCESS = nullptr;
+			proc->remainingCpuTime -= timeDuration;
+			proc->currentCpuBrust -= timeDuration;
+			scheduler->addProcess(proc);
+			printLog(evt, nullptr);
+			CALL_SCHEDULER = true;
 		}
 											 break;
 		default: {
