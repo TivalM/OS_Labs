@@ -28,8 +28,8 @@ bool compareTwoEvent(Event* eventA, Event* eventB);
 void printResult();
 
 bool vFlag = true;
-bool tFlag = false;
-bool eFlag = false;
+bool tFlag = true;
+bool eFlag = true;
 const char* sValue;
 int quantumNum = 100000;
 int maxProiNum = 4;
@@ -63,8 +63,10 @@ int main(int argc, char** argv)
 	inInputFile.open(inputFile);
 	inRandFile.open(randFile);
 	inRandFile >> randCount;
+	sValue = "F";
+	maxProiNum = 3;
+
 	readAllProcess();
-	sValue = "R";
 
 	if (strcmp(sValue, "F") == 0) {
 		scheduler = new FCFS();
@@ -78,6 +80,14 @@ int main(int argc, char** argv)
 	else if (strcmp(sValue, "R") == 0) {
 		scheduler = new FCFS();
 		quantumNum = 5;
+	}
+	else if (strcmp(sValue, "P") == 0) {
+		scheduler = new PRIO(maxProiNum);
+		quantumNum = 5;
+	}
+	else if (strcmp(sValue, "E") == 0) {
+		scheduler = new PRIO(maxProiNum);
+		quantumNum = 4;
 	}
 	simulation();
 	printResult();
@@ -127,6 +137,19 @@ void simulation() {
 		switch (evt->getTransitionType()) {
 		case TransitionType::CREATE_TO_READY: {
 			//add process into ready queue
+			if (strcmp(sValue, "E") == 0 && CURRENT_RUNNING_PROCESS != nullptr && CURRENT_RUNNING_PROCESS->dynamicPrio < proc->dynamicPrio) {
+				//preempt current process
+				//remove all event related to current process
+				for (int i = 0; i < eventList.size(); i++) {
+					if (eventList[i]->process == CURRENT_RUNNING_PROCESS && eventList[i]->timeStamp != currentTime) {
+						eventList.erase(eventList.begin() + i);
+						//add an new event to preempt current process
+						Event* newEvt = new Event(currentTime, CURRENT_RUNNING_PROCESS, ProcessState::RUNNING, ProcessState::READY);
+						eventList.push_back(newEvt);
+						stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+					}
+				}
+			}
 			scheduler->addProcess(proc);
 			CALL_SCHEDULER = true;
 			printLog(evt, nullptr);
@@ -137,6 +160,19 @@ void simulation() {
 			proc->IOTime += proc->currentIOBrust;
 			proc->currentIOBrust = 0;
 			proc->dynamicPrio = proc->staticPrio - 1;
+			if (strcmp(sValue, "E") == 0 && CURRENT_RUNNING_PROCESS != nullptr && CURRENT_RUNNING_PROCESS->dynamicPrio < proc->dynamicPrio) {
+				//preempt current process
+				//remove all event related to current process
+				for (int i = 0; i < eventList.size(); i++) {
+					if (eventList[i]->process == CURRENT_RUNNING_PROCESS && eventList[i]->timeStamp!=currentTime) {
+						eventList.erase(eventList.begin() + i);
+						//add an new event to preempt current process
+						Event* newEvt = new Event(currentTime, CURRENT_RUNNING_PROCESS, ProcessState::RUNNING, ProcessState::READY);
+						eventList.push_back(newEvt);
+						stable_sort(eventList.begin(), eventList.end(), compareTwoEvent);
+					}
+				}
+			}
 			//add process into ready queue
 			scheduler->addProcess(proc);
 			CALL_SCHEDULER = true;
@@ -153,14 +189,14 @@ void simulation() {
 		case TransitionType::READY_TO_RUNNING: {
 			proc->cpuWaitingTime += timeDuration;
 			int cb;
-			if (proc->currentCpuBrust==0){
+			if (proc->currentCpuBrust == 0) {
 				//generate a cpu brust
 				cb = readOneRandomInt(proc->maxCpuBurst);
 				cb = cb > proc->maxCpuBurst ? proc->maxCpuBurst : cb;
 				cb = cb > proc->remainingCpuTime ? proc->remainingCpuTime : cb;
 				proc->currentCpuBrust = cb;
 			}
-			else{
+			else {
 				//process reaming cpu brust
 				cb = proc->currentCpuBrust;
 			}
@@ -184,16 +220,16 @@ void simulation() {
 			CURRENT_RUNNING_PROCESS = nullptr;
 			//process consumed a cpu brust
 			proc->remainingCpuTime -= proc->currentCpuBrust;
+			proc->currentCpuBrust = 0;
 			if (proc->remainingCpuTime == 0) {
 				//process should terminate here 
 				proc->finishAtTime = currentTime;
 				printLog(evt, nullptr);
 			}
-			proc->currentCpuBrust = 0;
-			if (proc->remainingCpuTime > 0) {
+			else {
 				//generate an io brust
 				int ib = readOneRandomInt(proc->maxIOBurst);
-				ib = ib > proc->maxIOBurst ? proc->maxIOBurst : ib;;
+				ib = ib > proc->maxIOBurst ? proc->maxIOBurst : ib;
 				proc->currentIOBrust = ib;
 				//insert event block to ready
 				Event* newEvt = new Event(currentTime + ib, proc, ProcessState::BLOCKED, ProcessState::READY);
@@ -209,13 +245,19 @@ void simulation() {
 		}
 											 break;
 		case TransitionType::RUNNING_TO_READY: {
-			//preempted by the scheduler
 			CURRENT_RUNNING_PROCESS = nullptr;
 			proc->remainingCpuTime -= timeDuration;
 			proc->currentCpuBrust -= timeDuration;
+
+			proc->dynamicPrio -= 1;
+			if (proc->dynamicPrio == -1) {
+				proc->expired = true;
+				proc->dynamicPrio = proc->staticPrio - 1;
+			}
 			scheduler->addProcess(proc);
-			printLog(evt, nullptr);
 			CALL_SCHEDULER = true;
+			printLog(evt, nullptr);
+
 		}
 											 break;
 		default: {
@@ -267,15 +309,40 @@ void printLog(Event* evt, Event* newEvt) {
 			cout << "====>";
 			printEventQueue();
 		}
-	}
-	if (tFlag) {
-		if (evt != nullptr) {
-			cout << "SHCED(" << scheduler->readyQueue.size() << "): ";
-			int readyQueueSize = scheduler->readyQueue.size();
-			for (int i = 0; i < readyQueueSize; i++) {
-				cout << " " << scheduler->readyQueue[i]->pid << ":" << evt->timeStamp;
+		if (tFlag) {
+			if (evt != nullptr) {
+				if (strcmp(sValue, "E") != 0 && strcmp(sValue, "P") != 0)
+				{
+					cout << "SHCED(" << scheduler->readyQueue.size() << "): ";
+					int readyQueueSize = scheduler->readyQueue.size();
+					for (int i = 0; i < readyQueueSize; i++) {
+						cout << " " << scheduler->readyQueue[i]->pid << ":" << evt->timeStamp;
+					}
+					cout << endl;
+				}
+				else
+				{
+					PRIO* Prio = (PRIO*)scheduler;
+					cout << "{";
+					for (int i = 0; i < (Prio->mutiLevelReadyQueue->size()); i++) {
+						cout << "[";
+						for (int j = 0; j < (Prio->mutiLevelReadyQueue->at(i).size()); j++) {
+							cout << Prio->mutiLevelReadyQueue->at(i)[j]->pid << ",";
+						}
+						cout << "]";
+					}
+					cout << "}  {";
+					for (int i = 0; i < (Prio->mutiLevelExpriedQueue->size()); i++) {
+						cout << "[";
+						for (int j = 0; j < (Prio->mutiLevelExpriedQueue->at(i).size()); j++) {
+							cout << Prio->mutiLevelExpriedQueue->at(i)[j]->pid << ",";
+						}
+						cout << "]";
+					}
+					cout << "}";
+					cout << endl;
+				}
 			}
-			cout << endl;
 		}
 	}
 }

@@ -33,19 +33,24 @@ Event::~Event() {}
 
 void Event::printInfo()
 {
-	cout << timeStamp << "<" << process->pid << ">" << timeStamp - process->timeLastStateStart << " ";
-	if (process->remainingCpuTime==0){
-		cout << "Done"<<endl;
+	if (oldState != ProcessState::CREATED) {
+		cout << timeStamp << "<" << process->pid << ">" << timeStamp - process->timeLastStateStart << " ";
+	}
+	else {
+		cout << timeStamp << "<" << process->pid << ">" << 0 << " ";
+	}
+	if (process->remainingCpuTime == 0) {
+		cout << "Done" << endl;
 		return;
 	}
-	else{
+	else {
 		cout << stateToString(oldState) << " -> " << stateToString(newState) << " ";
 	}
-		
-	if (newState == ProcessState::RUNNING) {
+
+	if (newState == ProcessState::RUNNING || (newState == ProcessState::READY && oldState == ProcessState::RUNNING)) {
 		cout << "cb=" << process->currentCpuBrust << " rem=" << process->remainingCpuTime << " prio=" << process->dynamicPrio << endl;
 	}
-	else if (newState == ProcessState::BLOCKED) {
+	else if (newState == ProcessState::BLOCKED || (newState == ProcessState::READY && oldState == ProcessState::BLOCKED)) {
 		cout << "ib=" << process->currentIOBrust << " rem=" << process->remainingCpuTime << endl;
 	}
 	else {
@@ -88,7 +93,7 @@ Process* FCFS::getNextProcess()
 		if (readyQueue[0]->remainingCpuTime == 0)
 		{
 			readyQueue.pop_front();
-			getNextProcess();
+			return getNextProcess();
 		}
 		else {
 			Process* proc = readyQueue[0];
@@ -101,8 +106,6 @@ Process* FCFS::getNextProcess()
 	}
 }
 
-void FCFS::test_preempt(Process* p, int curtime) {
-}
 
 void LCFS::addProcess(Process* process)
 {
@@ -115,7 +118,7 @@ Process* LCFS::getNextProcess()
 		if (readyQueue[0]->remainingCpuTime == 0)
 		{
 			readyQueue.pop_front();
-			getNextProcess();
+			return getNextProcess();
 		}
 		else {
 			Process* proc = readyQueue[0];
@@ -126,10 +129,6 @@ Process* LCFS::getNextProcess()
 	else {
 		return nullptr;
 	}
-}
-
-void LCFS::test_preempt(Process* p, int curtime)
-{
 }
 
 void SRTF::addProcess(Process* process)
@@ -158,6 +157,55 @@ Process* SRTF::getNextProcess()
 	}
 }
 
-void SRTF::test_preempt(Process* p, int curtime)
+PRIO::PRIO(int maxPrio)
 {
+	mutiLevelReadyQueue = new deque<deque<Process*>>();
+	mutiLevelExpriedQueue = new deque<deque<Process*>>();
+
+	//priority levels [0..maxprio-1]
+	for (int i = 0; i < maxPrio; i++) {
+		mutiLevelReadyQueue->push_back(deque<Process*>());
+		mutiLevelExpriedQueue->push_back(deque<Process*>());
+	}
+}
+
+void PRIO::addProcess(Process* process)
+{
+	//´ËÌõ¼þ´íÎó
+	if (process->expired)
+	{
+		//add into expried queue
+		mutiLevelExpriedQueue->at(process->dynamicPrio).push_back(process);
+		process->expired = false;
+	}
+	else {
+		mutiLevelReadyQueue->at(process->dynamicPrio).push_back(process);
+	}
+}
+
+Process* PRIO::getNextProcess()
+{
+	for (int i = mutiLevelReadyQueue->size() - 1; i >= 0; i--) {
+		while (mutiLevelReadyQueue->at(i).size() != 0) {
+			if (mutiLevelReadyQueue->at(i)[0]->remainingCpuTime == 0) {
+				readyQueue.pop_front();
+			}
+			else {
+				Process* proc = mutiLevelReadyQueue->at(i)[0];
+				mutiLevelReadyQueue->at(i).pop_front();
+				swaped = false;
+				return proc;
+			}
+		}
+	}
+	if (!swaped) {
+		//empty active queue
+		deque<deque<Process*>>* tmp = mutiLevelReadyQueue;
+		mutiLevelReadyQueue = mutiLevelExpriedQueue;
+		mutiLevelExpriedQueue = tmp;
+		swaped = true;
+		return getNextProcess();
+	}
+	swaped = false;
+	return nullptr;
 }

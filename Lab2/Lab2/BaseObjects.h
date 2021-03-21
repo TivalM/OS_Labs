@@ -48,6 +48,7 @@ public:
 	int staticPrio;
 	int dynamicPrio;
 	int timeLastStateStart = 0;
+	bool expired = false;
 
 	int finishAtTime = 0;
 	int turnAroundTime = 0;
@@ -74,7 +75,6 @@ class Scheduler {
 public:
 	virtual void addProcess(Process* process) = 0;
 	virtual Process* getNextProcess() = 0;
-	virtual void test_preempt(Process* p, int curtime) = 0;
 
 	deque<Process*> readyQueue;
 };
@@ -84,19 +84,36 @@ class FCFS :public Scheduler {
 public:
 	void addProcess(Process* process);
 	Process* getNextProcess();
-	void test_preempt(Process* p, int curtime);
 };
 
 class LCFS :public Scheduler {
 public:
 	void addProcess(Process* process);
 	Process* getNextProcess();
-	void test_preempt(Process* p, int curtime);
 };
 
 class SRTF :public Scheduler {
 public:
 	void addProcess(Process* process);
 	Process* getNextProcess();
-	void test_preempt(Process* p, int curtime);
+};
+
+class PRIO :public Scheduler {
+public:
+	PRIO(int maxPrio);
+	void addProcess(Process* process);
+	Process* getNextProcess();
+
+	bool swaped = false;
+	deque<deque<Process*>>* mutiLevelReadyQueue;
+	deque<deque<Process*>>* mutiLevelExpriedQueue;
+};
+
+class PREPRIO :public PRIO {
+public:
+	PREPRIO(int maxPrio);
+	void addProcess(Process* process);
+	Process* getNextProcess();
+
+	bool swaped = false;
 };
