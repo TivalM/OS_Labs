@@ -75,12 +75,6 @@ int main(int argc, char** argv)
 		case 's':
 			sValue = optarg;
 			break;
-		case 'V':
-			quantumNum = atoi(optarg);;
-			break;
-		case 'p':
-			maxProiNum = atoi(optarg);;
-			break;
 		}
 	}
 	inputFile = argv[optind];
@@ -90,9 +84,12 @@ int main(int argc, char** argv)
 		string s = sValue;
 		s = s.substr(1, s.size());
 		string delimiter = ":";
-		quantumNum = stoi(s.substr(0, s.find(delimiter)));
-		s.erase(0, s.find(delimiter) + delimiter.length());
-		maxProiNum = stoi(s);
+		string q = s.substr(0, s.find(delimiter));
+		quantumNum = stoi(q);
+		if (q.length()!= s.length()){
+			s.erase(0, s.find(delimiter) + delimiter.length());
+			maxProiNum = stoi(s);
+		}
 	}
 	type = sValue[0];
 	if (vFlag) {
