@@ -14,6 +14,7 @@
 #include "getopt.h"
 #else
 #include <unistd.h>
+#include <getopt.h>
 #endif
 using namespace std;
 
@@ -27,10 +28,11 @@ void simulation();
 bool compareTwoEvent(Event* eventA, Event* eventB);
 void printResult();
 
-bool vFlag = true;
-bool tFlag = true;
-bool eFlag = true;
+bool vFlag = false;
+bool tFlag = false;
+bool eFlag = false;
 const char* sValue;
+char type;
 int quantumNum = 100000;
 int maxProiNum = 4;
 int randCount = 0;
@@ -56,38 +58,70 @@ int runningIOCount = 0;
 int ioStartTime;
 int main(int argc, char** argv)
 {
-	//inputFile = argv[1];
-	//randFile = argv[2];
-	inputFile = "G:\\NYU\\OS\\Labs\\Lab2\\assignment\\lab2_sample\\input6";
-	randFile = "G:\\NYU\\OS\\Labs\\Lab2\\assignment\\lab2_sample\\rfile";
+	// proper way to parse arguments
+	int c;
+	while ((c = getopt(argc, argv, "vtes:")) != -1)
+	{
+		switch (c) {
+		case 'v':
+			vFlag = true;
+			break;
+		case 't':
+			tFlag = true;
+			break;
+		case 'e':
+			eFlag = true;
+			break;
+		case 's':
+			sValue = optarg;
+			break;
+		case 'V':
+			quantumNum = atoi(optarg);;
+			break;
+		case 'p':
+			maxProiNum = atoi(optarg);;
+			break;
+		}
+	}
+	inputFile = argv[optind];
+	randFile = argv[optind + 1];
+	if (sValue[0] != 'F' && sValue[0] != 'L' && sValue[0] != 'S') {
+		//prase -s
+		string s = sValue;
+		s = s.substr(1, s.size());
+		string delimiter = ":";
+		quantumNum = stoi(s.substr(0, s.find(delimiter)));
+		s.erase(0, s.find(delimiter) + delimiter.length());
+		maxProiNum = stoi(s);
+	}
+	type = sValue[0];
+	if (vFlag) {
+		cout << "vte" << vFlag << tFlag << eFlag << " " << type << " " << quantumNum << " " << maxProiNum << " " << inputFile << " " << randFile;
+	}
 	inInputFile.open(inputFile);
 	inRandFile.open(randFile);
 	inRandFile >> randCount;
-	sValue = "F";
-	maxProiNum = 3;
+
 
 	readAllProcess();
 
-	if (strcmp(sValue, "F") == 0) {
+	if (type == 'F') {
 		scheduler = new FCFS();
 	}
-	else if (strcmp(sValue, "L") == 0) {
+	else if (type == 'L') {
 		scheduler = new LCFS();
 	}
-	else if (strcmp(sValue, "S") == 0) {
+	else if (type == 'S') {
 		scheduler = new SRTF();
 	}
-	else if (strcmp(sValue, "R") == 0) {
+	else if (type == 'R') {
 		scheduler = new FCFS();
-		quantumNum = 5;
 	}
-	else if (strcmp(sValue, "P") == 0) {
+	else if (type == 'P') {
 		scheduler = new PRIO(maxProiNum);
-		quantumNum = 5;
 	}
-	else if (strcmp(sValue, "E") == 0) {
+	else if (type == 'E') {
 		scheduler = new PRIO(maxProiNum);
-		quantumNum = 4;
 	}
 	simulation();
 	printResult();
@@ -137,7 +171,7 @@ void simulation() {
 		switch (evt->getTransitionType()) {
 		case TransitionType::CREATE_TO_READY: {
 			//add process into ready queue
-			if (strcmp(sValue, "E") == 0 && CURRENT_RUNNING_PROCESS != nullptr && CURRENT_RUNNING_PROCESS->dynamicPrio < proc->dynamicPrio) {
+			if (type == 'E' && CURRENT_RUNNING_PROCESS != nullptr && CURRENT_RUNNING_PROCESS->dynamicPrio < proc->dynamicPrio) {
 				//preempt current process
 				//remove all event related to current process
 				for (int i = 0; i < eventList.size(); i++) {
@@ -160,11 +194,11 @@ void simulation() {
 			proc->IOTime += proc->currentIOBrust;
 			proc->currentIOBrust = 0;
 			proc->dynamicPrio = proc->staticPrio - 1;
-			if (strcmp(sValue, "E") == 0 && CURRENT_RUNNING_PROCESS != nullptr && CURRENT_RUNNING_PROCESS->dynamicPrio < proc->dynamicPrio) {
+			if (type == 'E' && CURRENT_RUNNING_PROCESS != nullptr && CURRENT_RUNNING_PROCESS->dynamicPrio < proc->dynamicPrio) {
 				//preempt current process
 				//remove all event related to current process
 				for (int i = 0; i < eventList.size(); i++) {
-					if (eventList[i]->process == CURRENT_RUNNING_PROCESS && eventList[i]->timeStamp!=currentTime) {
+					if (eventList[i]->process == CURRENT_RUNNING_PROCESS && eventList[i]->timeStamp != currentTime) {
 						eventList.erase(eventList.begin() + i);
 						//add an new event to preempt current process
 						Event* newEvt = new Event(currentTime, CURRENT_RUNNING_PROCESS, ProcessState::RUNNING, ProcessState::READY);
@@ -311,7 +345,7 @@ void printLog(Event* evt, Event* newEvt) {
 		}
 		if (tFlag) {
 			if (evt != nullptr) {
-				if (strcmp(sValue, "E") != 0 && strcmp(sValue, "P") != 0)
+				if (type != 'E' && type != 'P')
 				{
 					cout << "SHCED(" << scheduler->readyQueue.size() << "): ";
 					int readyQueueSize = scheduler->readyQueue.size();
@@ -378,9 +412,25 @@ bool compareTwoEvent(Event* eventA, Event* eventB) {
 //double Throughoput;
 
 void printResult() {
-	if (strcmp(sValue, "F") == 0) {
+	if (type == 'F') {
 		cout << "FCFS" << endl;
 	}
+	else if (type == 'L') {
+		cout << "LCFS" << endl;
+	}
+	else if (type == 'S') {
+		cout << "SRTF" << endl;
+	}
+	else if (type == 'R') {
+		cout << "RR " << quantumNum << endl;
+	}
+	else if (type == 'P') {
+		cout << "PRIO " << quantumNum << endl;
+	}
+	else if (type == 'E') {
+		cout << "PREPRIO " << quantumNum << endl;
+	}
+
 	for (int i = 0; i < processList.size(); i++) {
 		Process* proc = processList[i];
 		CpuUtil += proc->totalCpuTime;
