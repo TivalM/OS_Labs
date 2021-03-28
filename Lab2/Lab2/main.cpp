@@ -134,7 +134,7 @@ int readOneRandomInt(int seed) {
 	inRandFile >> randInt;
 	if (randInt == -1) {
 		//empty line
-		return 1 + (readOneRandomInt(seed) % seed);
+		return readOneRandomInt(seed);
 	}
 	return 1 + (randInt % seed);
 }
