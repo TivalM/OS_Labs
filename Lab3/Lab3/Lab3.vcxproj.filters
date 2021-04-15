@@ -26,10 +26,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Lab2\Lab2\getopt.h">
+    <ClInclude Include="BaseObjects.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="BaseObjects.h">
+    <ClInclude Include="getopt.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
