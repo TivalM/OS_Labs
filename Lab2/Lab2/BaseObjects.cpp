@@ -171,7 +171,6 @@ PRIO::PRIO(int maxPrio)
 
 void PRIO::addProcess(Process* process)
 {
-	//´ËÌõ¼þ´íÎó
 	if (process->expired)
 	{
 		//add into expried queue

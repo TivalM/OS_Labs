@@ -7,13 +7,23 @@ using namespace std;
 static int PAGE_TABLE_ENTRY_NUM = 64;
 
 struct PageTabelEntry {
-    unsigned valid : 1;
-    unsigned peferenced : 1;
+    unsigned initialized : 1;
+    unsigned present: 1;
+    unsigned notInVMAs : 1;
+    unsigned reference : 1;
     unsigned modified : 1;
     unsigned writeProtect : 1;
     unsigned pageout : 1;
-    unsigned frameNumber : 7;
-    unsigned reservedBits : 20;
+    unsigned fileMapped : 1;
+    unsigned int frameNumber : 7;
+    unsigned reservedBits : 17;
+};
+
+struct FrameTableEntry {
+    unsigned isOccupied : 1;
+    unsigned index : 7;
+    unsigned reverseVirtualTableNum : 6;    //0-63
+    unsigned reverseProcessNum : 4;         //max 10 process
 };
 
 class Process
@@ -24,7 +34,21 @@ public:
     ~Process();
     void addOneVirtualMemoryArea(int startPage, int endingPage, int writeProtected, int fileMapped);
     void printProcess();
+    void clearPageTable();
 
     int pid;
     vector<int*> virtualMemoryAreas;
+    vector<PageTabelEntry*> pageTable;
+};
+
+class Pager
+{
+public:
+    virtual FrameTableEntry* selectVictimFrame(FrameTableEntry** frameTable, int frameTableSize) = 0;
+};
+
+class FIFO : public Pager {
+public:
+    int hand = 0;
+    FrameTableEntry* selectVictimFrame(FrameTableEntry** frameTable, int frameTableSize);
 };

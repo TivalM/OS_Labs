@@ -5,6 +5,10 @@ int Process::counter = 0;
 Process::Process()
 {
 	pid = counter++;
+	for (int i = 0; i < PAGE_TABLE_ENTRY_NUM; i++) {
+		PageTabelEntry* entry = new PageTabelEntry();
+		pageTable.push_back(entry);
+	}
 }
 
 Process::~Process()
@@ -27,4 +31,21 @@ void Process::printProcess() {
 			" " << this->virtualMemoryAreas.at(i)[2] << " " << this->virtualMemoryAreas.at(i)[3]<<endl;
 	}
 	cout << endl;
+}
+
+void Process::clearPageTable(){
+	pageTable.clear();
+	for (int i = 0; i < PAGE_TABLE_ENTRY_NUM; i++) {
+		PageTabelEntry* entry = new PageTabelEntry();
+		pageTable.push_back(entry);
+	}
+}
+
+FrameTableEntry* FIFO::selectVictimFrame(FrameTableEntry** frameTable, int frameTableSize)
+{
+	//hand [0, frameTableSize)
+	if (hand == frameTableSize){
+		hand = 0;
+	}
+	return frameTable[hand++];
 }
