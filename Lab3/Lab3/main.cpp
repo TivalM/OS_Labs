@@ -28,7 +28,26 @@ FrameTableEntry* getFrame();
 
 deque<Process*> processList;
 int randCount = 0;
+
 int FRAME_COUNT;
+unsigned long INST_COUNT = -1;
+unsigned long CTX_SWITCHES = 0;
+unsigned long PROCESS_EXITS = 0;
+unsigned long long COST = 0;
+
+int time_rw = 1;
+int time_ctx = 130;
+int time_exit = 1250;
+int time_maps = 300;
+int time_unmaps = 400;
+int time_ins = 3100;
+int time_outs = 2700;
+int time_fins = 2800;
+int time_fouts = 2400;
+int time_zeros = 140;
+int time_segv = 340;
+int time_segprot = 420;
+
 const char* inputFile = NULL;
 const char* randFile = NULL;
 std::ifstream inInputFile;
@@ -38,13 +57,13 @@ char currentInstType;
 int currentInstNum;
 bool readable = true;
 FrameTableEntry** frameTable;
-deque<int> freeFrameList;
+deque<FrameTableEntry*> freeFrameList;
 Pager* thePager;
 Process* currentProcess;
 vector<PageTabelEntry*>* currentPageTable;
 
 int main(int argc, char** argv) {
-	inputFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\in10";
+	inputFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\in11";
 	randFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\rfile";
 	inInputFile.open(inputFile);
 	inRandFile.open(randFile);
@@ -60,18 +79,17 @@ int main(int argc, char** argv) {
 		frameTable[i] = new FrameTableEntry();
 		frameTable[i]->isOccupied = 0;
 		frameTable[i]->index = i;
-		freeFrameList.push_back(i);
+		freeFrameList.push_back(frameTable[i]);
 	}
 	//for (int i = 0; i < processList.size(); i++)
 	//{
-	//	processList.at(i)->printProcess();
+	//	processList.at(i)->printVirtualMemoryAreas();
 	//}
 
 	//skip # line before instruction
 	while ((strLine == "" && !inInputFile.eof())) {
 		getline(inInputFile, strLine);
 	}
-	int instCount = -1;
 
 	//simulation
 	while (true) {
@@ -81,32 +99,40 @@ int main(int argc, char** argv) {
 		}
 		//logic for each instruction 
 		//cout << currentInstType << " " << currentInstNum<<endl;
-		instCount++;
-		cout << instCount << ":" << " ==> " << currentInstType << " " << currentInstNum << endl;
+		INST_COUNT++;
+		cout << INST_COUNT << ":" << " ==> " << currentInstType << " " << currentInstNum << endl;
 		if (currentInstType == 'c') {
 			//switch in process
+			CTX_SWITCHES++;
+			COST += time_ctx;
 			currentProcess = processList.at(currentInstNum);
 			currentPageTable = &(currentProcess->pageTable);
 		}
 		else if (currentInstType == 'e') {
-			cout << "EXIT current process " << currentProcess->pid<<endl;
+			cout << "EXIT current process " << currentProcess->pid << endl;
 			//switch out process
+			PROCESS_EXITS++;
+			COST += time_exit;
 			for (int i = 0; i < currentPageTable->size(); i++) {
 				PageTabelEntry* entry = currentPageTable->at(i);
 				if (entry->present == 1) {
-					freeFrameList.push_back(entry->frameNumber);
+					freeFrameList.push_back(frameTable[entry->frameNumber]);
 					frameTable[entry->frameNumber]->isOccupied = 0;
 					cout << " UNMAP " << currentProcess->pid << ":" << i << endl;
+					currentProcess->unmaps++;
+					COST += time_unmaps;
 					if (entry->modified == 1)
 					{
 						if (entry->fileMapped == 1) {
 							cout << " FOUT" << endl;
+							currentProcess->fouts++;
+							COST += time_fouts;
 						}
-						entry->modified = 0;
 					}
 				}
 
 			}
+			currentProcess->clearPageTable();
 		}
 		else {
 			PageTabelEntry* pageTableEntry = currentPageTable->at(currentInstNum);
@@ -134,6 +160,11 @@ int main(int argc, char** argv) {
 				if (pageTableEntry->notInVMAs == 1) {
 					// currentInstNum fall in a hole
 					cout << " SEGV" << endl;
+					currentProcess->segv++;
+					COST += time_segv;
+					if (currentInstType == 'r' || currentInstType == 'w'){
+						COST += time_rw;
+					}
 					continue;
 				}
 				//vaild page in VMA, page in it
@@ -145,15 +176,22 @@ int main(int argc, char** argv) {
 						PageTabelEntry* reversePageTableEntry = reverseProcess->pageTable.at(newFrame->reverseVirtualTableNum);
 						reversePageTableEntry->present = 0;
 						cout << " UNMAP " << reverseProcess->pid << ":" << newFrame->reverseVirtualTableNum << endl;
+						newFrame->isOccupied = 0;
+						reverseProcess->unmaps++;
+						COST += time_unmaps;
 						if (reversePageTableEntry->modified == 1)
 						{
 							if (reversePageTableEntry->fileMapped == 1) {
 								cout << " FOUT" << endl;
+								reverseProcess->fouts++;
+								COST += time_fouts;
 							}
 							else {
 								cout << " OUT" << endl;
+								reverseProcess->outs++;
+								reversePageTableEntry->pageout = 1;
+								COST += time_outs;
 							}
-							reversePageTableEntry->pageout = 1;
 							reversePageTableEntry->modified = 0;
 						}
 					}
@@ -166,15 +204,24 @@ int main(int argc, char** argv) {
 					newFrame->isOccupied = 1;
 					if (currentPageTableEntry->fileMapped == 1) {
 						cout << " FIN" << endl;
+						currentProcess->fins++;
+						COST += time_fins;
 					}
 					else if (currentPageTableEntry->pageout == 1) {
 						cout << " IN" << endl;
+						currentProcess->ins++;
+						COST += time_ins;
 					}
 					else {
 						cout << " ZERO" << endl;
+						currentProcess->zeros++;
+						COST += time_zeros;
 					}
-
+					currentPageTableEntry->modified = 0;
+					currentPageTableEntry->reference = 0;
 					cout << " MAP " << newFrame->index << endl;
+					currentProcess->maps++;
+					COST += time_maps;
 				}
 				else {
 					cout << "selected a null frame, should never be here";
@@ -184,18 +231,45 @@ int main(int argc, char** argv) {
 			PageTabelEntry* currentPageTableEntry = currentPageTable->at(currentInstNum);
 			if (currentInstType == 'r') {
 				currentPageTableEntry->reference = 1;
+				COST += time_rw;
 			}
 			else if (currentInstType == 'w') {
-				if (currentPageTableEntry->writeProtect == 1){
+				COST += time_rw;
+				currentPageTableEntry->reference = 1;
+				if (currentPageTableEntry->writeProtect == 1) {
 					cout << " SEGPROT" << endl;
+					currentProcess->segprot++;
+					COST += time_segprot;
 				}
 				else {
-					currentPageTableEntry->reference = 1;
 					currentPageTableEntry->modified = 1;
 				}
 			}
 		}
 	}
+
+	//print each PT
+	for (int i = 0; i < processList.size(); i++) {
+		processList.at(i)->printPageTable();
+	}
+	//print FT
+	cout << "FT: ";
+	for (int i = 0; i < FRAME_COUNT; i++) {
+		if (frameTable[i]->isOccupied) {
+			cout << frameTable[i]->reverseProcessNum << ":" << frameTable[i]->reverseVirtualTableNum << " ";
+		}
+		else{
+			cout << "* ";
+		}
+	}
+	cout << endl;
+	//print process summary
+	for (int i = 0; i < processList.size(); i++) {
+		processList.at(i)->printProcessSummary();
+	}
+	//print total summary
+	printf("TOTALCOST %lu %lu %lu %llu %llu\n",
+		INST_COUNT + 1, CTX_SWITCHES, PROCESS_EXITS, COST, sizeof(PageTabelEntry));
 }
 
 int readOneRandomInt(int seed) {
@@ -210,7 +284,7 @@ int readOneRandomInt(int seed) {
 		//empty line
 		return readOneRandomInt(seed);
 	}
-	return 1 + (randInt % seed);
+	return randInt % seed;
 }
 
 void readAllProcess() {
@@ -256,7 +330,7 @@ FrameTableEntry* getFrame() {
 
 FrameTableEntry* allocateFrameFromFreeList() {
 	if (freeFrameList.size() > 0) {
-		FrameTableEntry* entry = frameTable[freeFrameList.front()];
+		FrameTableEntry* entry = freeFrameList.front();
 		freeFrameList.pop_front();
 		return entry;
 	}

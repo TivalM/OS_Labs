@@ -33,10 +33,20 @@ public:
     Process();
     ~Process();
     void addOneVirtualMemoryArea(int startPage, int endingPage, int writeProtected, int fileMapped);
-    void printProcess();
+    void printVirtualMemoryAreas();
+    void printPageTable();
     void clearPageTable();
-
+    void printProcessSummary();
     int pid;
+    unsigned long unmaps;
+    unsigned long maps;
+    unsigned long ins;
+    unsigned long outs;
+    unsigned long fins;
+    unsigned long fouts;
+    unsigned long zeros;
+    unsigned long segv;
+    unsigned long segprot;
     vector<int*> virtualMemoryAreas;
     vector<PageTabelEntry*> pageTable;
 };
