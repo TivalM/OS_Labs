@@ -1,10 +1,11 @@
 #pragma once
 #include <iostream>
 #include <vector>
+#include <deque>
 using namespace std;
 
 
-static int PAGE_TABLE_ENTRY_NUM = 64;
+static const int PAGE_TABLE_ENTRY_NUM = 64;
 
 struct PageTabelEntry {
     unsigned initialized : 1;
@@ -21,7 +22,6 @@ struct PageTabelEntry {
 
 struct FrameTableEntry {
     unsigned isOccupied : 1;
-    unsigned index : 7;
     unsigned reverseVirtualTableNum : 6;    //0-63
     unsigned reverseProcessNum : 4;         //max 10 process
 };
@@ -48,17 +48,23 @@ public:
     unsigned long segv;
     unsigned long segprot;
     vector<int*> virtualMemoryAreas;
-    vector<PageTabelEntry*> pageTable;
+    PageTabelEntry pageTable[PAGE_TABLE_ENTRY_NUM];
 };
 
 class Pager
 {
 public:
-    virtual FrameTableEntry* selectVictimFrame(FrameTableEntry** frameTable, int frameTableSize) = 0;
+    virtual FrameTableEntry* selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize) = 0;
 };
 
 class FIFO : public Pager {
 public:
     int hand = 0;
-    FrameTableEntry* selectVictimFrame(FrameTableEntry** frameTable, int frameTableSize);
+    FrameTableEntry* selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
+};
+
+class CLOCK : public FIFO {
+public:
+    int hand = 0;
+    FrameTableEntry* selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
 };

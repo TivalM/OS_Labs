@@ -5,16 +5,17 @@ int Process::counter = 0;
 Process::Process()
 {
 	pid = counter++;
-	for (int i = 0; i < PAGE_TABLE_ENTRY_NUM; i++) {
-		PageTabelEntry* entry = new PageTabelEntry();
-		pageTable.push_back(entry);
-	}
+	//for (int i = 0; i < PAGE_TABLE_ENTRY_NUM; i++) {
+	//	PageTabelEntry* entry = new PageTabelEntry();
+	//	pageTable.push_back(entry);
+	//}
 }
 
 Process::~Process()
 {
 	for (int i = 0; i < this->virtualMemoryAreas.size(); i++) {
 		delete[] virtualMemoryAreas[i];
+		delete[] pageTable;
 	}
 }
 
@@ -35,15 +36,15 @@ void Process::printVirtualMemoryAreas() {
 
 void Process::printPageTable() {
 	cout << "PT[" << pid << "]: ";
-	for (int i = 0; i < this->pageTable.size(); i++) {
-		if (pageTable.at(i)->present == 1) {
+	for (int i = 0; i < PAGE_TABLE_ENTRY_NUM; i++) {
+		if (pageTable[i].present == 1) {
 			cout << i << ":";
-			cout << ((pageTable.at(i)->reference == 1) ? "R" : "-");
-			cout << ((pageTable.at(i)->modified == 1) ? "M" : "-");
-			cout << ((pageTable.at(i)->pageout == 1) ? "S" : "-");
+			cout << ((pageTable[i].reference == 1) ? "R" : "-");
+			cout << ((pageTable[i].modified == 1) ? "M" : "-");
+			cout << ((pageTable[i].pageout == 1) ? "S" : "-");
 			cout << " ";
 		}
-		else if (pageTable.at(i)->pageout == 1 && pageTable.at(i)->fileMapped == 0) {
+		else if (pageTable[i].pageout == 1 && pageTable[i].fileMapped == 0) {
 			cout << "# ";
 		}
 		else {
@@ -54,10 +55,13 @@ void Process::printPageTable() {
 }
 
 void Process::clearPageTable() {
-	pageTable.clear();
 	for (int i = 0; i < PAGE_TABLE_ENTRY_NUM; i++) {
-		PageTabelEntry* entry = new PageTabelEntry();
-		pageTable.push_back(entry);
+		pageTable[i].initialized = 0;
+		pageTable[i].frameNumber = 0;
+		pageTable[i].modified = 0;
+		pageTable[i].present = 0;
+		pageTable[i].reference = 0;
+		pageTable[i].pageout = 0;
 	}
 }
 
@@ -67,11 +71,28 @@ void Process::printProcessSummary(){
 		fouts, zeros, segv, segprot);
 }
 
-FrameTableEntry* FIFO::selectVictimFrame(FrameTableEntry** frameTable, int frameTableSize)
+FrameTableEntry* FIFO::selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
 {
 	//hand [0, frameTableSize)
 	if (hand == frameTableSize) {
 		hand = 0;
 	}
-	return frameTable[hand++];
+	return &frameTable[hand++];
+}
+
+FrameTableEntry* CLOCK::selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
+{
+	//hand [0, frameTableSize)
+	if (hand == frameTableSize) {
+		hand = 0;
+	}
+	FrameTableEntry* entry = &frameTable[hand++];
+	PageTabelEntry* pageTableEntry = &processes.at(entry->reverseProcessNum)->pageTable[entry->reverseVirtualTableNum];
+	if (pageTableEntry->reference == 1){
+		pageTableEntry->reference = 0;
+		selectVictimFrame(processes, frameTable, frameTableSize);
+	}
+	else{
+		return entry;
+	}
 }
