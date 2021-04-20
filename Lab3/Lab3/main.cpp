@@ -71,20 +71,20 @@ int main(int argc, char** argv) {
 	inInputFile.open(inputFile);
 	inRandFile.open(randFile);
 	inRandFile >> randCount;
-	FRAME_COUNT = 16;
-	type = 'C';
+	FRAME_COUNT = 32;
+	type = 'E';
 
 	if (type == 'F') {
 		thePager = new FIFO();
 	}
 	else if (type == 'R') {
-		//thePager = new LCFS();
+		thePager = new RANDOM();
 	}
 	else if (type == 'C') {
 		thePager = new CLOCK();
 	}
 	else if (type == 'E') {
-		//thePager = new FCFS();
+		thePager = new NRU();
 	}
 	else if (type == 'A') {
 		//thePager = new PRIO(maxProiNum);
@@ -343,7 +343,7 @@ void readNextInstrction() {
 FrameTableEntry* getFrame() {
 	FrameTableEntry* frame = allocateFrameFromFreeList();
 	if (frame == nullptr) {
-		frame = thePager->selectVictimFrame(processList, frameTable, FRAME_COUNT);
+		frame = thePager->selectVictimFrame(INST_COUNT ,processList, frameTable, FRAME_COUNT, readOneRandomInt(FRAME_COUNT));
 	}
 	return frame;
 }

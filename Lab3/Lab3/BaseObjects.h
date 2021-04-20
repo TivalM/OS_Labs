@@ -54,17 +54,29 @@ public:
 class Pager
 {
 public:
-    virtual FrameTableEntry* selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize) = 0;
+    virtual FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum) = 0;
 };
 
 class FIFO : public Pager {
 public:
     int hand = 0;
-    FrameTableEntry* selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
 };
 
 class CLOCK : public FIFO {
 public:
     int hand = 0;
-    FrameTableEntry* selectVictimFrame(deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
+};
+
+class RANDOM : public Pager {
+public:
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
+};
+
+class NRU : public Pager {
+public:
+    int hand = 0;
+    unsigned long lastCalledInst = -1;
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
 };
