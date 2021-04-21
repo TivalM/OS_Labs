@@ -293,18 +293,23 @@ int main(int argc, char** argv) {
 }
 
 int readOneRandomInt(int seed) {
-	int randInt = -1;
-	if (!inRandFile.is_open() || inRandFile.eof()) {
-		inRandFile.close();
-		inRandFile.open(randFile);
-		inRandFile >> randCount;
+	if (type == 'R'){
+		int randInt = -1;
+		if (!inRandFile.is_open() || inRandFile.eof()) {
+			inRandFile.close();
+			inRandFile.open(randFile);
+			inRandFile >> randCount;
+		}
+		inRandFile >> randInt;
+		if (randInt == -1) {
+			//empty line
+			return readOneRandomInt(seed);
+		}
+		return randInt % seed;
 	}
-	inRandFile >> randInt;
-	if (randInt == -1) {
-		//empty line
-		return readOneRandomInt(seed);
+	else{
+		return 0;
 	}
-	return randInt % seed;
 }
 
 void readAllProcess() {
