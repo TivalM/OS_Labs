@@ -52,7 +52,6 @@ int time_segprot = 420;
 const char* inputFile = NULL;
 const char* randFile = NULL;
 std::ifstream inInputFile;
-std::ifstream inRandFile;
 string strLine;
 char currentInstType;
 int currentInstNum;
@@ -69,16 +68,14 @@ int main(int argc, char** argv) {
 	inputFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\in11";
 	randFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\rfile";
 	inInputFile.open(inputFile);
-	inRandFile.open(randFile);
-	inRandFile >> randCount;
-	FRAME_COUNT = 32;
+	FRAME_COUNT = 16;
 	type = 'E';
 
 	if (type == 'F') {
 		thePager = new FIFO();
 	}
 	else if (type == 'R') {
-		thePager = new RANDOM();
+		thePager = new RANDOM(randFile);
 	}
 	else if (type == 'C') {
 		thePager = new CLOCK();
@@ -292,26 +289,6 @@ int main(int argc, char** argv) {
 		INST_COUNT + 1, CTX_SWITCHES, PROCESS_EXITS, COST, sizeof(PageTabelEntry));
 }
 
-int readOneRandomInt(int seed) {
-	if (type == 'R'){
-		int randInt = -1;
-		if (!inRandFile.is_open() || inRandFile.eof()) {
-			inRandFile.close();
-			inRandFile.open(randFile);
-			inRandFile >> randCount;
-		}
-		inRandFile >> randInt;
-		if (randInt == -1) {
-			//empty line
-			return readOneRandomInt(seed);
-		}
-		return randInt % seed;
-	}
-	else{
-		return 0;
-	}
-}
-
 void readAllProcess() {
 	//skip first few # lines and get process count
 	strLine = "";
@@ -348,7 +325,7 @@ void readNextInstrction() {
 FrameTableEntry* getFrame() {
 	FrameTableEntry* frame = allocateFrameFromFreeList();
 	if (frame == nullptr) {
-		frame = thePager->selectVictimFrame(INST_COUNT ,processList, frameTable, FRAME_COUNT, readOneRandomInt(FRAME_COUNT));
+		frame = thePager->selectVictimFrame(INST_COUNT ,processList, frameTable, FRAME_COUNT);
 	}
 	return frame;
 }

@@ -65,13 +65,13 @@ void Process::clearPageTable() {
 	}
 }
 
-void Process::printProcessSummary(){
+void Process::printProcessSummary() {
 	printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
-		pid, unmaps, maps, ins, outs, fins, 
+		pid, unmaps, maps, ins, outs, fins,
 		fouts, zeros, segv, segprot);
 }
 
-FrameTableEntry* FIFO::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum)
+FrameTableEntry* FIFO::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
 {
 	//hand [0, frameTableSize)
 	if (hand == frameTableSize) {
@@ -80,7 +80,7 @@ FrameTableEntry* FIFO::selectVictimFrame(unsigned long currentInst, deque<Proces
 	return &frameTable[hand++];
 }
 
-FrameTableEntry* CLOCK::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum)
+FrameTableEntry* CLOCK::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
 {
 	//hand [0, frameTableSize)
 	if (hand == frameTableSize) {
@@ -88,83 +88,101 @@ FrameTableEntry* CLOCK::selectVictimFrame(unsigned long currentInst, deque<Proce
 	}
 	FrameTableEntry* entry = &frameTable[hand++];
 	PageTabelEntry* pageTableEntry = &processes.at(entry->reverseProcessNum)->pageTable[entry->reverseVirtualTableNum];
-	if (pageTableEntry->reference == 1){
+	if (pageTableEntry->reference == 1) {
 		pageTableEntry->reference = 0;
-		selectVictimFrame(currentInst, processes, frameTable, frameTableSize, randomNum);
+		selectVictimFrame(currentInst, processes, frameTable, frameTableSize);
 	}
-	else{
+	else {
 		return entry;
 	}
 }
 
-FrameTableEntry* NRU::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum)
+FrameTableEntry* NRU::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
 {
 	bool needResetReferenceBit = (currentInst - lastCalledInst >= 50);
-	if (needResetReferenceBit){
+	if (needResetReferenceBit) {
 		lastCalledInst = currentInst;
 	}
 
+	//first frame
 	FrameTableEntry* frameEntry = &frameTable[hand];
 	PageTabelEntry* pageTableEntry = &processes.at(frameEntry->reverseProcessNum)->pageTable[frameEntry->reverseVirtualTableNum];
 	int start = hand;
-
-	//try to find a better one than the beginning
-	unsigned int currentSelectedFrameIndex = hand++;
+	unsigned int currentSelectedFrameIndex = hand;
 	unsigned int selectedFrameModified = pageTableEntry->modified;
 	unsigned int selectedFrameReferenced = pageTableEntry->reference;
 
+	hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
 	if (pageTableEntry->modified == 0 && pageTableEntry->reference == 0 && !needResetReferenceBit) {
-		hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;
 		return frameEntry;
 	}
-	if (needResetReferenceBit){
+	if (needResetReferenceBit) {
 		pageTableEntry->reference = 0;
 	}
 
-	for (;hand != start; hand++){
+	//try to find a better one than the beginning
+	for (; hand != start; hand++) {
 		if (hand == frameTableSize) {
 			hand = 0;
-			if (hand == start){
+			if (hand == start) {
 				break;
 			}
 		}
 		frameEntry = &frameTable[hand];
 		pageTableEntry = &processes.at(frameEntry->reverseProcessNum)->pageTable[frameEntry->reverseVirtualTableNum];
 		if (pageTableEntry->modified == 0 && pageTableEntry->reference == 0) {
-			if (!needResetReferenceBit){
+			if (!needResetReferenceBit) {
+				hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
 				return frameEntry;
 			}
-			else{
-				currentSelectedFrameIndex = hand;
-				selectedFrameModified = pageTableEntry->modified;
-				selectedFrameReferenced = pageTableEntry->reference;
-			}
 		}
-		else {
-			if (pageTableEntry->reference < selectedFrameReferenced) {
+
+		if (pageTableEntry->reference < selectedFrameReferenced) {
+			//select a better frame
+			currentSelectedFrameIndex = hand;
+			selectedFrameModified = pageTableEntry->modified;
+			selectedFrameReferenced = pageTableEntry->reference;
+		}
+		else if (pageTableEntry->reference == selectedFrameReferenced) {
+			if (pageTableEntry->modified < selectedFrameModified) {
 				//select a better frame
 				currentSelectedFrameIndex = hand;
 				selectedFrameModified = pageTableEntry->modified;
 				selectedFrameReferenced = pageTableEntry->reference;
 			}
-			else if(pageTableEntry->reference == selectedFrameReferenced){
-				if (pageTableEntry->modified < selectedFrameModified){
-					//select a better frame
-					currentSelectedFrameIndex = hand;
-					selectedFrameModified = pageTableEntry->modified;
-					selectedFrameReferenced = pageTableEntry->reference;
-				}
-			}
-			if (needResetReferenceBit && pageTableEntry->reference != 0){
-				pageTableEntry->reference = 0;
-			}
+		}
+		if (needResetReferenceBit && pageTableEntry->reference != 0) {
+			pageTableEntry->reference = 0;
 		}
 	}
 	hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;
 	return &frameTable[currentSelectedFrameIndex];
 }
 
-FrameTableEntry* RANDOM::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNumber)
+RANDOM::RANDOM(const char* randFile)
 {
-	return &frameTable[randomNumber];
+	this->randFile = randFile;
+	inRandFile.open(randFile);
+	inRandFile >> randCount;
+}
+
+FrameTableEntry* RANDOM::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
+{
+	return &frameTable[readOneRandomInt(frameTableSize)];
+}
+
+int RANDOM::readOneRandomInt(int seed)
+{
+	int randInt = -1;
+	if (!inRandFile.is_open() || inRandFile.eof()) {
+		inRandFile.close();
+		inRandFile.open(randFile);
+		inRandFile >> randCount;
+	}
+	inRandFile >> randInt;
+	if (randInt == -1) {
+		//empty line
+		return readOneRandomInt(seed);
+	}
+	return randInt % seed;
 }

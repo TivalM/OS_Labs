@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <deque>
+#include <fstream>
 using namespace std;
 
 
@@ -54,29 +55,34 @@ public:
 class Pager
 {
 public:
-    virtual FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum) = 0;
+    virtual FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize) = 0;
 };
 
 class FIFO : public Pager {
 public:
     int hand = 0;
-    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
 };
 
 class CLOCK : public FIFO {
 public:
     int hand = 0;
-    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
 };
 
 class RANDOM : public Pager {
 public:
-    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
+    RANDOM(const char* randFile);
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
+    int readOneRandomInt(int seed);
+    const char* randFile;
+    int randCount;
+    std::ifstream inRandFile;
 };
 
 class NRU : public Pager {
 public:
     int hand = 0;
     unsigned long lastCalledInst = -1;
-    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize, int randomNum);
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
 };
