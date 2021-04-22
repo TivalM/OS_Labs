@@ -186,3 +186,48 @@ int RANDOM::readOneRandomInt(int seed)
 	}
 	return randInt % seed;
 }
+
+FrameTableEntry* AGING::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
+{
+	//aging
+	for (int i = 0; i < frameTableSize; i++) {
+		if (frameTable[i].isOccupied == 1) {
+			Process* reverseProcess = processes.at(frameTable[i].reverseProcessNum);
+			PageTabelEntry* reversePageTableEntry = &reverseProcess->pageTable[frameTable[i].reverseVirtualTableNum];
+			frameTable[i].age = frameTable[i].age >> 1;
+			if (reversePageTableEntry->reference == 1) {
+				frameTable[i].age = (frameTable[i].age | 0x80000000);
+				reversePageTableEntry->reference = 0;
+			}
+		}
+	}
+
+	int start = hand;
+	unsigned int currentSelectedFrameIndex = hand;
+	unsigned int  tmpAge = frameTable[hand].age;
+	hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
+
+	if (frameTable[currentSelectedFrameIndex].age == 0) {
+		return &frameTable[currentSelectedFrameIndex];
+	}
+
+	for (; hand != start; hand++) {
+		if (hand == frameTableSize) {
+			hand = 0;
+			if (hand == start) {
+				break;
+			}
+		}
+		if (frameTable[hand].age == 0) {
+			currentSelectedFrameIndex = hand;
+			hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
+			return &frameTable[currentSelectedFrameIndex];
+		}
+		if (frameTable[hand].age < tmpAge) {
+			currentSelectedFrameIndex = hand;
+			tmpAge = frameTable[hand].age;
+		}
+	}
+	hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;
+	return &frameTable[currentSelectedFrameIndex];
+}

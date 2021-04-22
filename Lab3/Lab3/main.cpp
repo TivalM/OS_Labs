@@ -68,8 +68,8 @@ int main(int argc, char** argv) {
 	inputFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\in11";
 	randFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\rfile";
 	inInputFile.open(inputFile);
-	FRAME_COUNT = 16;
-	type = 'E';
+	FRAME_COUNT = 32;
+	type = 'A';
 
 	if (type == 'F') {
 		thePager = new FIFO();
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
 		thePager = new NRU();
 	}
 	else if (type == 'A') {
-		//thePager = new PRIO(maxProiNum);
+		thePager = new AGING();
 	}
 	else if (type == 'W') {
 		//thePager = new PRIO(maxProiNum);
@@ -96,6 +96,7 @@ int main(int argc, char** argv) {
 	//init frame table and free list
 	for (int i = 0; i < FRAME_COUNT; i++) {
 		frameTable[i].isOccupied = 0;
+		frameTable[i].age = 0;
 		freeFrameList.push_back(i);
 	}
 	//for (int i = 0; i < processList.size(); i++)
@@ -135,6 +136,7 @@ int main(int argc, char** argv) {
 				if (entry->present == 1) {
 					freeFrameList.push_back(entry->frameNumber);
 					frameTable[entry->frameNumber].isOccupied = 0;
+					frameTable[entry->frameNumber].age = 0;
 					cout << " UNMAP " << currentProcess->pid << ":" << i << endl;
 					currentProcess->unmaps++;
 					COST += time_unmaps;
@@ -219,6 +221,7 @@ int main(int argc, char** argv) {
 					newFrame->reverseProcessNum = currentProcess->pid;
 					newFrame->reverseVirtualTableNum = currentInstNum;
 					newFrame->isOccupied = 1;
+					newFrame->age = 0;
 					if (currentPageTableEntry->fileMapped == 1) {
 						cout << " FIN" << endl;
 						currentProcess->fins++;

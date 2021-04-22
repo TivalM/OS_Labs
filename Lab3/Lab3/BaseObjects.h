@@ -25,6 +25,7 @@ struct FrameTableEntry {
     unsigned isOccupied : 1;
     unsigned reverseVirtualTableNum : 6;    //0-63
     unsigned reverseProcessNum : 4;         //max 10 process
+    unsigned int age;
 };
 
 class Process
@@ -84,5 +85,11 @@ class NRU : public Pager {
 public:
     int hand = 0;
     unsigned long lastCalledInst = -1;
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
+};
+
+class AGING : public Pager {
+public:
+    int hand = 0;
     FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
 };
