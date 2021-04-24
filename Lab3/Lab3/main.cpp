@@ -68,11 +68,37 @@ bool FlagS = false;
 #define frame_idx(frame) ((frame)-frameTable)
 
 int main(int argc, char** argv) {
-	inputFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\in11";
-	randFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\rfile";
+	int c;
+	while ((c = getopt(argc, argv, "f:a:o:")) != -1)
+	{
+		switch (c) {
+		case 'f':
+			FRAME_COUNT = atoi(optarg);
+			break;
+		case 'a':
+			type = optarg[0];
+			break;
+		case 'o':
+			string value = optarg;
+			if (value.find("O") != string::npos){
+				FlagO = true;
+			}
+			if(value.find("P") != string::npos){
+				FlagP = true;
+			}
+			if (value.find("F") != string::npos) {
+				FlagF = true;
+			}
+			if (value.find("S") != string::npos) {
+				FlagS = true;
+			}
+			break;
+		}
+	}
+
+	inputFile = argv[optind];
+	randFile = argv[optind + 1];
 	inInputFile.open(inputFile);
-	FRAME_COUNT = 32;
-	type = 'w';
 
 	if (type == 'f') {
 		thePager = new FIFO();
