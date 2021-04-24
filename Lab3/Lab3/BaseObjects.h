@@ -10,21 +10,22 @@ static const int PAGE_TABLE_ENTRY_NUM = 64;
 
 struct PageTabelEntry {
     unsigned initialized : 1;
-    unsigned present: 1;
+    unsigned present : 1;
     unsigned notInVMAs : 1;
     unsigned reference : 1;
     unsigned modified : 1;
     unsigned writeProtect : 1;
     unsigned pageout : 1;
     unsigned fileMapped : 1;
-    unsigned int frameNumber : 7;
-    unsigned reservedBits : 17;
+    unsigned int frameNumber : 7;           //0-127
+    unsigned reservedBits : 10;
 };
 
 struct FrameTableEntry {
     unsigned isOccupied : 1;
     unsigned reverseVirtualTableNum : 6;    //0-63
     unsigned reverseProcessNum : 4;         //max 10 process
+    unsigned long lastUsedTime;
     unsigned int age;
 };
 
@@ -89,6 +90,12 @@ public:
 };
 
 class AGING : public Pager {
+public:
+    int hand = 0;
+    FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);
+};
+
+class WORKINGSET : public Pager {
 public:
     int hand = 0;
     FrameTableEntry* selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize);

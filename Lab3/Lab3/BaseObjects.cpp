@@ -90,11 +90,9 @@ FrameTableEntry* CLOCK::selectVictimFrame(unsigned long currentInst, deque<Proce
 	PageTabelEntry* pageTableEntry = &processes.at(entry->reverseProcessNum)->pageTable[entry->reverseVirtualTableNum];
 	if (pageTableEntry->reference == 1) {
 		pageTableEntry->reference = 0;
-		selectVictimFrame(currentInst, processes, frameTable, frameTableSize);
+		return selectVictimFrame(currentInst, processes, frameTable, frameTableSize);
 	}
-	else {
-		return entry;
-	}
+	return entry;
 }
 
 FrameTableEntry* NRU::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
@@ -111,16 +109,17 @@ FrameTableEntry* NRU::selectVictimFrame(unsigned long currentInst, deque<Process
 	unsigned int currentSelectedFrameIndex = hand;
 	unsigned int selectedFrameModified = pageTableEntry->modified;
 	unsigned int selectedFrameReferenced = pageTableEntry->reference;
-
 	hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
+	//if first entry is suitable
 	if (pageTableEntry->modified == 0 && pageTableEntry->reference == 0 && !needResetReferenceBit) {
+		//hand already increased
 		return frameEntry;
 	}
 	if (needResetReferenceBit) {
 		pageTableEntry->reference = 0;
 	}
 
-	//try to find a better one than the beginning
+	//try to find a better one than the beginning || reset rest entries
 	for (; hand != start; hand++) {
 		if (hand == frameTableSize) {
 			hand = 0;
@@ -128,13 +127,12 @@ FrameTableEntry* NRU::selectVictimFrame(unsigned long currentInst, deque<Process
 				break;
 			}
 		}
+		//start from start + 1 || 0
 		frameEntry = &frameTable[hand];
 		pageTableEntry = &processes.at(frameEntry->reverseProcessNum)->pageTable[frameEntry->reverseVirtualTableNum];
-		if (pageTableEntry->modified == 0 && pageTableEntry->reference == 0) {
-			if (!needResetReferenceBit) {
+		if (pageTableEntry->modified == 0 && pageTableEntry->reference == 0 && !needResetReferenceBit) {
 				hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
 				return frameEntry;
-			}
 		}
 
 		if (pageTableEntry->reference < selectedFrameReferenced) {
@@ -151,10 +149,12 @@ FrameTableEntry* NRU::selectVictimFrame(unsigned long currentInst, deque<Process
 				selectedFrameReferenced = pageTableEntry->reference;
 			}
 		}
+		// reset reference bit
 		if (needResetReferenceBit && pageTableEntry->reference != 0) {
 			pageTableEntry->reference = 0;
 		}
 	}
+	// scaned all entries
 	hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;
 	return &frameTable[currentSelectedFrameIndex];
 }
@@ -202,6 +202,7 @@ FrameTableEntry* AGING::selectVictimFrame(unsigned long currentInst, deque<Proce
 		}
 	}
 
+	//basic struct looks like NRU
 	int start = hand;
 	unsigned int currentSelectedFrameIndex = hand;
 	unsigned int  tmpAge = frameTable[hand].age;
@@ -224,8 +225,59 @@ FrameTableEntry* AGING::selectVictimFrame(unsigned long currentInst, deque<Proce
 			return &frameTable[currentSelectedFrameIndex];
 		}
 		if (frameTable[hand].age < tmpAge) {
+			// select a better entry
 			currentSelectedFrameIndex = hand;
 			tmpAge = frameTable[hand].age;
+		}
+	}
+	hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;
+	return &frameTable[currentSelectedFrameIndex];
+}
+
+FrameTableEntry* WORKINGSET::selectVictimFrame(unsigned long currentInst, deque<Process*>& processes, FrameTableEntry* frameTable, int frameTableSize)
+{
+	//basic struct looks like NRU
+	int start = hand;
+	unsigned int currentSelectedFrameIndex = hand;
+	hand = hand + 1 >= frameTableSize ? 0 : hand + 1;
+
+	FrameTableEntry* frameEntry = &frameTable[currentSelectedFrameIndex];
+	PageTabelEntry* pageTableEntry = &processes.at(frameEntry->reverseProcessNum)->pageTable[frameEntry->reverseVirtualTableNum];
+	if (pageTableEntry->reference == 0 && currentInst - frameTable[currentSelectedFrameIndex].lastUsedTime > 49) {
+		// abort searching
+		return &frameTable[currentSelectedFrameIndex];
+	}
+	else if(pageTableEntry->reference == 1){
+		pageTableEntry->reference = 0;
+		frameEntry->lastUsedTime = currentInst;
+	}
+
+	for (; hand != start; hand++) {
+		if (hand == frameTableSize) {
+			hand = 0;
+			if (hand == start) {
+				break;
+			}
+		}
+		FrameTableEntry* frameEntry = &frameTable[hand];
+		PageTabelEntry* pageTableEntry = &processes.at(frameEntry->reverseProcessNum)->pageTable[frameEntry->reverseVirtualTableNum];
+		if (pageTableEntry->reference == 1) {
+			pageTableEntry->reference = 0;
+			frameEntry->lastUsedTime = currentInst;
+			continue;
+		}
+		else {
+			if (currentInst - frameEntry->lastUsedTime > 49) {
+				// find a entry, abort searching
+				currentSelectedFrameIndex = hand;
+				hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;
+				return &frameTable[currentSelectedFrameIndex];
+			}
+			else {
+				if (frameEntry->lastUsedTime < frameTable[currentSelectedFrameIndex].lastUsedTime) {
+					currentSelectedFrameIndex = hand;
+				}
+			}
 		}
 	}
 	hand = currentSelectedFrameIndex + 1 >= frameTableSize ? 0 : currentSelectedFrameIndex + 1;

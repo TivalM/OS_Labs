@@ -25,9 +25,7 @@ void readAllProcess();
 void readNextInstrction();
 FrameTableEntry* allocateFrameFromFreeList();
 FrameTableEntry* getFrame();
-
 deque<Process*> processList;
-int randCount = 0;
 
 int FRAME_COUNT;
 unsigned long INST_COUNT = -1;
@@ -62,6 +60,11 @@ Pager* thePager;
 Process* currentProcess;
 PageTabelEntry* currentPageTable;
 
+bool FlagO = false;
+bool FlagP = false;
+bool FlagF = false;
+bool FlagS = false;
+
 #define frame_idx(frame) ((frame)-frameTable)
 
 int main(int argc, char** argv) {
@@ -69,25 +72,25 @@ int main(int argc, char** argv) {
 	randFile = "G:\\NYU\\OS\\Labs\\Lab3\\lab3_assign\\inputs\\rfile";
 	inInputFile.open(inputFile);
 	FRAME_COUNT = 32;
-	type = 'A';
+	type = 'w';
 
-	if (type == 'F') {
+	if (type == 'f') {
 		thePager = new FIFO();
 	}
-	else if (type == 'R') {
+	else if (type == 'r') {
 		thePager = new RANDOM(randFile);
 	}
-	else if (type == 'C') {
+	else if (type == 'c') {
 		thePager = new CLOCK();
 	}
-	else if (type == 'E') {
+	else if (type == 'e') {
 		thePager = new NRU();
 	}
-	else if (type == 'A') {
+	else if (type == 'a') {
 		thePager = new AGING();
 	}
-	else if (type == 'W') {
-		//thePager = new PRIO(maxProiNum);
+	else if (type == 'w') {
+		thePager = new WORKINGSET();
 	}
 
 	//cout << "MyStruct size:\t" << sizeof(PageTabelEntry) << endl;
@@ -97,6 +100,7 @@ int main(int argc, char** argv) {
 	for (int i = 0; i < FRAME_COUNT; i++) {
 		frameTable[i].isOccupied = 0;
 		frameTable[i].age = 0;
+		frameTable[i].lastUsedTime = 0;
 		freeFrameList.push_back(i);
 	}
 	//for (int i = 0; i < processList.size(); i++)
@@ -104,7 +108,7 @@ int main(int argc, char** argv) {
 	//	processList.at(i)->printVirtualMemoryAreas();
 	//}
 
-	//skip # line before instruction
+	//skip line before instruction
 	while ((strLine == "" && !inInputFile.eof())) {
 		getline(inInputFile, strLine);
 	}
@@ -118,7 +122,9 @@ int main(int argc, char** argv) {
 		//logic for each instruction 
 		//cout << currentInstType << " " << currentInstNum<<endl;
 		INST_COUNT++;
-		cout << INST_COUNT << ":" << " ==> " << currentInstType << " " << currentInstNum << endl;
+		if (FlagO){
+			cout << INST_COUNT << ":" << " ==> " << currentInstType << " " << currentInstNum << endl;
+		}
 		if (currentInstType == 'c') {
 			//switch in process
 			CTX_SWITCHES++;
@@ -127,7 +133,9 @@ int main(int argc, char** argv) {
 			currentPageTable = currentProcess->pageTable;
 		}
 		else if (currentInstType == 'e') {
-			cout << "EXIT current process " << currentProcess->pid << endl;
+			if (FlagO) {
+				cout << "EXIT current process " << currentProcess->pid << endl;
+			}
 			//switch out process
 			PROCESS_EXITS++;
 			COST += time_exit;
@@ -137,13 +145,18 @@ int main(int argc, char** argv) {
 					freeFrameList.push_back(entry->frameNumber);
 					frameTable[entry->frameNumber].isOccupied = 0;
 					frameTable[entry->frameNumber].age = 0;
-					cout << " UNMAP " << currentProcess->pid << ":" << i << endl;
+					frameTable[entry->frameNumber].lastUsedTime = 0;
+					if (FlagO) {
+						cout << " UNMAP " << currentProcess->pid << ":" << i << endl;
+					}
 					currentProcess->unmaps++;
 					COST += time_unmaps;
 					if (entry->modified == 1)
 					{
 						if (entry->fileMapped == 1) {
-							cout << " FOUT" << endl;
+							if (FlagO) {
+								cout << " FOUT" << endl;
+							}
 							currentProcess->fouts++;
 							COST += time_fouts;
 						}
@@ -178,10 +191,12 @@ int main(int argc, char** argv) {
 				}
 				if (pageTableEntry->notInVMAs == 1) {
 					// currentInstNum fall in a hole
-					cout << " SEGV" << endl;
+					if (FlagO) {
+						cout << " SEGV" << endl;
+					}
 					currentProcess->segv++;
 					COST += time_segv;
-					if (currentInstType == 'r' || currentInstType == 'w'){
+					if (currentInstType == 'r' || currentInstType == 'w') {
 						COST += time_rw;
 					}
 					continue;
@@ -194,24 +209,31 @@ int main(int argc, char** argv) {
 						Process* reverseProcess = processList.at(newFrame->reverseProcessNum);
 						PageTabelEntry* reversePageTableEntry = &reverseProcess->pageTable[newFrame->reverseVirtualTableNum];
 						reversePageTableEntry->present = 0;
-						cout << " UNMAP " << reverseProcess->pid << ":" << newFrame->reverseVirtualTableNum << endl;
+						if (FlagO) {
+							cout << " UNMAP " << reverseProcess->pid << ":" << newFrame->reverseVirtualTableNum << endl;
+						}
 						newFrame->isOccupied = 0;
 						reverseProcess->unmaps++;
 						COST += time_unmaps;
 						if (reversePageTableEntry->modified == 1)
 						{
 							if (reversePageTableEntry->fileMapped == 1) {
-								cout << " FOUT" << endl;
+								if (FlagO) {
+									cout << " FOUT" << endl;
+								}
 								reverseProcess->fouts++;
 								COST += time_fouts;
 							}
 							else {
-								cout << " OUT" << endl;
+								if (FlagO) {
+									cout << " OUT" << endl;
+								}
 								reverseProcess->outs++;
 								reversePageTableEntry->pageout = 1;
 								COST += time_outs;
 							}
 							reversePageTableEntry->modified = 0;
+							reversePageTableEntry->reference = 0;
 						}
 					}
 					// page in
@@ -222,24 +244,33 @@ int main(int argc, char** argv) {
 					newFrame->reverseVirtualTableNum = currentInstNum;
 					newFrame->isOccupied = 1;
 					newFrame->age = 0;
+					newFrame->lastUsedTime = INST_COUNT;
 					if (currentPageTableEntry->fileMapped == 1) {
-						cout << " FIN" << endl;
+						if (FlagO) {
+							cout << " FIN" << endl;
+						}
 						currentProcess->fins++;
 						COST += time_fins;
 					}
 					else if (currentPageTableEntry->pageout == 1) {
-						cout << " IN" << endl;
+						if (FlagO) {
+							cout << " IN" << endl;
+						}
 						currentProcess->ins++;
 						COST += time_ins;
 					}
 					else {
-						cout << " ZERO" << endl;
+						if (FlagO) {
+							cout << " ZERO" << endl;
+						}
 						currentProcess->zeros++;
 						COST += time_zeros;
 					}
 					currentPageTableEntry->modified = 0;
 					currentPageTableEntry->reference = 0;
-					cout << " MAP " << frame_idx(newFrame) << endl;
+					if (FlagO) {
+						cout << " MAP " << frame_idx(newFrame) << endl;
+					}
 					currentProcess->maps++;
 					COST += time_maps;
 				}
@@ -257,7 +288,9 @@ int main(int argc, char** argv) {
 				COST += time_rw;
 				currentPageTableEntry->reference = 1;
 				if (currentPageTableEntry->writeProtect == 1) {
-					cout << " SEGPROT" << endl;
+					if (FlagO) {
+						cout << " SEGPROT" << endl;
+					}
 					currentProcess->segprot++;
 					COST += time_segprot;
 				}
@@ -269,33 +302,39 @@ int main(int argc, char** argv) {
 	}
 
 	//print each PT
-	for (int i = 0; i < processList.size(); i++) {
-		processList.at(i)->printPageTable();
+	if (FlagP) {
+		for (int i = 0; i < processList.size(); i++) {
+			processList.at(i)->printPageTable();
+		}
 	}
 	//print FT
-	cout << "FT: ";
-	for (int i = 0; i < FRAME_COUNT; i++) {
-		if (frameTable[i].isOccupied) {
-			cout << frameTable[i].reverseProcessNum << ":" << frameTable[i].reverseVirtualTableNum << " ";
+	if (FlagF) {
+		cout << "FT: ";
+		for (int i = 0; i < FRAME_COUNT; i++) {
+			if (frameTable[i].isOccupied) {
+				cout << frameTable[i].reverseProcessNum << ":" << frameTable[i].reverseVirtualTableNum << " ";
+			}
+			else {
+				cout << "* ";
+			}
 		}
-		else{
-			cout << "* ";
-		}
+		cout << endl;
 	}
-	cout << endl;
 	//print process summary
-	for (int i = 0; i < processList.size(); i++) {
-		processList.at(i)->printProcessSummary();
+	if (FlagS) {
+		for (int i = 0; i < processList.size(); i++) {
+			processList.at(i)->printProcessSummary();
+		}
+		//print total summary
+		printf("TOTALCOST %lu %lu %lu %llu %llu\n",
+			INST_COUNT + 1, CTX_SWITCHES, PROCESS_EXITS, COST, sizeof(PageTabelEntry));
 	}
-	//print total summary
-	printf("TOTALCOST %lu %lu %lu %llu %llu\n",
-		INST_COUNT + 1, CTX_SWITCHES, PROCESS_EXITS, COST, sizeof(PageTabelEntry));
 }
 
 void readAllProcess() {
 	//skip first few # lines and get process count
 	strLine = "";
-	while ((strLine == "" && !inInputFile.eof()) || strLine.rfind("#", 0) == 0) {
+	while ((strLine == "" || strLine.rfind("#", 0) == 0) && !inInputFile.eof()) {
 		getline(inInputFile, strLine);
 	}
 	int processNum = stoi(strLine);
@@ -303,7 +342,7 @@ void readAllProcess() {
 	int a, b, c, d;
 	for (int i = 0; i < processNum; i++) {
 		Process* process = new Process();
-		while ((strLine == "" && !inInputFile.eof()) || strLine.rfind("#", 0) == 0) {
+		while ((strLine == "" || strLine.rfind("#", 0) == 0) && !inInputFile.eof()) {
 			getline(inInputFile, strLine);
 		}
 		int areaNum = stoi(strLine);
@@ -317,6 +356,7 @@ void readAllProcess() {
 }
 
 void readNextInstrction() {
+	currentInstType == '#';
 	if (!inInputFile.eof()) {
 		inInputFile >> currentInstType >> currentInstNum;
 	}
@@ -328,7 +368,7 @@ void readNextInstrction() {
 FrameTableEntry* getFrame() {
 	FrameTableEntry* frame = allocateFrameFromFreeList();
 	if (frame == nullptr) {
-		frame = thePager->selectVictimFrame(INST_COUNT ,processList, frameTable, FRAME_COUNT);
+		frame = thePager->selectVictimFrame(INST_COUNT, processList, frameTable, FRAME_COUNT);
 	}
 	return frame;
 }
