@@ -382,7 +382,7 @@ void readAllProcess() {
 }
 
 void readNextInstrction() {
-	currentInstType == '#';
+	currentInstType = '#';
 	if (!inInputFile.eof()) {
 		inInputFile >> currentInstType >> currentInstNum;
 	}
