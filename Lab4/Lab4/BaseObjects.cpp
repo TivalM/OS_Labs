@@ -17,7 +17,7 @@ void ioRequestEntry::printBasicInfo() {
 	cout << issueTime << " " << track << endl;
 }
 
-ioRequestEntry* FIFO::getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList)
+ioRequestEntry* FIFO::getNextIO(unsigned int trackPointer)
 {
 	ioRequestEntry* request = activeRequestList->at(0);
 	activeRequestList->pop_front();
@@ -28,16 +28,27 @@ void FIFO::increaseTrack() {
 
 }
 
-ioRequestEntry* SSTF::getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList)
+ioRequestEntry* SSTF::getNextIO(unsigned int trackPointer)
 {
-	return nullptr;
+	int distance = INT_MAX;
+	int selectedIndex = 0;
+	for (int i = 0; i < activeRequestList->size(); i++) {
+		int newDistance = labs(activeRequestList->at(i)->track - trackPointer);
+		if (newDistance < distance){
+			selectedIndex = i;
+			distance = newDistance;
+		}
+	}
+	ioRequestEntry* request = activeRequestList->at(selectedIndex);
+	activeRequestList->erase(activeRequestList->begin() + selectedIndex);
+	return request;
 }
 
 void SSTF::increaseTrack()
 {
 }
 
-ioRequestEntry* LOOK::getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList)
+ioRequestEntry* LOOK::getNextIO(unsigned int trackPointer)
 {
 	return nullptr;
 }
@@ -46,7 +57,7 @@ void LOOK::increaseTrack()
 {
 }
 
-ioRequestEntry* CLOOK::getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList)
+ioRequestEntry* CLOOK::getNextIO(unsigned int trackPointer)
 {
 	return nullptr;
 }
@@ -55,11 +66,14 @@ void CLOOK::increaseTrack()
 {
 }
 
-ioRequestEntry* FLOOK::getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList)
+ioRequestEntry* FLOOK::getNextIO(unsigned int trackPointer)
 {
 	return nullptr;
 }
 
 void FLOOK::increaseTrack()
 {
+}
+
+Scheduler::Scheduler(){
 }

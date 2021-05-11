@@ -22,36 +22,39 @@ public:
 class Scheduler
 {
 public:
-    virtual ioRequestEntry* getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList) = 0;
+    Scheduler();
+    deque<ioRequestEntry*>* activeRequestList = new deque<ioRequestEntry*>();
+    virtual ioRequestEntry* getNextIO(unsigned int trackPointer) = 0;
     virtual void increaseTrack() = 0;
 };
 
 class FIFO : public Scheduler {
 public:
-    ioRequestEntry* getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList);
+    ioRequestEntry* getNextIO(unsigned int trackPointer);
     void increaseTrack();
 };
 
 class SSTF :public Scheduler {
 public:
-	ioRequestEntry* getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList);
+	ioRequestEntry* getNextIO(unsigned int trackPointer);
     void increaseTrack();
 };
 
 class LOOK :public Scheduler {
 public:
-	ioRequestEntry* getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList);
+    bool increasePointer = true;
+	ioRequestEntry* getNextIO(unsigned int trackPointer);
     void increaseTrack();
 };
 
 class CLOOK :public Scheduler {
 public:
-	ioRequestEntry* getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList);
+	ioRequestEntry* getNextIO(unsigned int trackPointer);
     void increaseTrack();
 };
 
 class FLOOK :public Scheduler {
 public:
-    ioRequestEntry* getNextIO(deque<ioRequestEntry*>* addRequestList, deque<ioRequestEntry*>* activeRequestList);
+    ioRequestEntry* getNextIO(unsigned int trackPointer);
     void increaseTrack();
 };

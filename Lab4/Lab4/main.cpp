@@ -52,9 +52,6 @@ int currentIOIssueTime;
 int currentIOTrack;
 bool readable = true;
 deque<ioRequestEntry*>* ioRequestList = new deque<ioRequestEntry*>();
-deque<ioRequestEntry*>* activeRequestList = new deque<ioRequestEntry*>();
-deque<ioRequestEntry*>*   = new deque<ioRequestEntry*>();
-
 Scheduler* scheduler;
 
 bool FlagV = false;
@@ -81,8 +78,8 @@ int main(int argc, char** argv) {
 	//	}
 	//}
 
-	type = 'i';
-	inputFile = "G:\\NYU\\OS\\Labs\\Lab4\\lab4_assign\\input0";
+	type = 'j';
+	inputFile = "G:\\NYU\\OS\\Labs\\Lab4\\lab4_assign\\input9";
 	//inputFile = argv[optind];
 	inInputFile.open(inputFile);
 
@@ -106,40 +103,48 @@ int main(int argc, char** argv) {
 	//for (int i = 0; i < ioRequestList->size(); i++) {
 	//	cout << ioRequestList->at(i)->issueTime << " " << ioRequestList->at(i)->track<<endl;
 	//}
+	int requestIndex = 0;
 	unsigned int TRACK_POINTER = 0;
 	unsigned int POINTER_START_FROM = 0;
-	unsigned int WAIT_TIME = 0;
+	unsigned long WAIT_TIME = 0;
+	unsigned long CONSUME_TIME = 0;
 	int TOTAL_REQUEST_NUM = ioRequestList->size();
 	ioRequestEntry* CURRENT_IO = nullptr;
-	for (unsigned long timeStemp = 0; ; timeStemp++) {
-		if (ioRequestList->size() != 0 && timeStemp == ioRequestList->at(0)->issueTime) {
+	for (unsigned long timeStemp = 0; ;) {
+		if (requestIndex != ioRequestList->size() && timeStemp == ioRequestList->at(requestIndex)->issueTime) {
 			//a new I/O arrived
-			activeRequestList->push_back(ioRequestList->at(0));
-			ioRequestList->pop_front();
+			scheduler->activeRequestList->push_back(ioRequestList->at(requestIndex++));
 		}
 		if (CURRENT_IO != nullptr) {
 			if (TRACK_POINTER == CURRENT_IO->track) {
 				//an IO is active and completed at this time
 				CURRENT_IO->endTime = timeStemp;
-				if (ioRequestList->size() == 0) {
+				if (requestIndex == ioRequestList->size()) {
 					TOTAL_TIME = CURRENT_IO->endTime;
 				}
+				CONSUME_TIME += timeStemp - CURRENT_IO->issueTime;
 				TOTAL_MOVEMENT += (labs(TRACK_POINTER - POINTER_START_FROM));
 				POINTER_START_FROM = TRACK_POINTER;
 				CURRENT_IO = nullptr;
 			}
-			else {
+			else{
 				//an IO is active but did not yet complete
 				TRACK_POINTER = TRACK_POINTER < CURRENT_IO->track ? TRACK_POINTER + 1 : TRACK_POINTER - 1;
+				timeStemp++;
 			}
 		}
-		if (CURRENT_IO == nullptr && activeRequestList->size() != 0) {
+		if (CURRENT_IO == nullptr && scheduler->activeRequestList->size() != 0) {
 			//If no IO request active now (after (2)) but IO requests are pending
-			CURRENT_IO = scheduler->getNextIO(ioRequestList, activeRequestList);
-			WAIT_TIME += timeStemp - CURRENT_IO->issueTime;
-			MAX_WAITTIME = timeStemp - CURRENT_IO->issueTime > MAX_WAITTIME ? timeStemp - CURRENT_IO->issueTime : MAX_WAITTIME;
+			CURRENT_IO = scheduler->getNextIO(TRACK_POINTER);
+			CURRENT_IO->startTime = timeStemp;
+			unsigned long currentWaitTime= timeStemp - CURRENT_IO->issueTime;
+			WAIT_TIME += currentWaitTime;
+			MAX_WAITTIME = currentWaitTime > MAX_WAITTIME ? currentWaitTime : MAX_WAITTIME;
 		}
-		if (ioRequestList->size() == 0 && CURRENT_IO == nullptr) {
+		if (CURRENT_IO == nullptr && requestIndex != ioRequestList->size()){
+			timeStemp++;
+		}
+		else if (requestIndex == ioRequestList->size() && CURRENT_IO == nullptr) {
 			break;
 		}
 	}
@@ -147,8 +152,8 @@ int main(int argc, char** argv) {
 	for (int i = 0; i < ioRequestList->size(); i++) {
 		printf("%5d: %5d %5d %5d\n", i, ioRequestList->at(i)->issueTime, ioRequestList->at(i)->startTime, ioRequestList->at(i)->endTime);
 	}
-	AVG_TURNAROUND = TOTAL_TIME / TOTAL_REQUEST_NUM;
-	AVG_WAITTIME = WAIT_TIME / TOTAL_REQUEST_NUM;
+	AVG_TURNAROUND = (double)CONSUME_TIME / (double)TOTAL_REQUEST_NUM;
+	AVG_WAITTIME = (double)WAIT_TIME / (double)TOTAL_REQUEST_NUM;
 	//print total summary
 	printf("SUM: %d %d %.2lf %.2lf %d\n",
 		TOTAL_TIME, TOTAL_MOVEMENT, AVG_TURNAROUND, AVG_WAITTIME, MAX_WAITTIME);
